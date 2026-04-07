@@ -95,6 +95,34 @@
 <script>
 if (sessionStorage.getItem('cr_user')) window.location.href = '/';
 
+// Auto-login from QR code
+const params = new URLSearchParams(window.location.search);
+const qrUID = params.get('uid');
+if (qrUID) {
+    btn.className = 'nfc-btn ok';
+    icon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="currentColor" stroke-width="2.5" fill="none"/>';
+    label.textContent = 'QR DETECTADO';
+    msg.textContent = 'Verificando...';
+    msg.style.color = '#81c995';
+    (async () => {
+        try {
+            const res = await fetch(API + '/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cardUID: qrUID.trim().toUpperCase() }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                msg.textContent = 'Bienvenido, ' + data.user.name;
+                sessionStorage.setItem('cr_user', JSON.stringify(data.user));
+                setTimeout(() => window.location.href = '/', 600);
+            } else {
+                fail(data.error || 'QR no valido');
+            }
+        } catch (e) { fail('Error de conexion'); }
+    })();
+}
+
 const API = window.location.origin + '/api';
 const btn = document.getElementById('btn');
 const icon = document.getElementById('icon');
