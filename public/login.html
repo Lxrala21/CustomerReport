@@ -149,6 +149,53 @@
         }
         .scan-hint svg { width: 16px; height: 16px; flex-shrink: 0; }
 
+        .nfc-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            color: var(--accent);
+            border: 2px solid var(--accent);
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all .2s;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .nfc-btn:hover { background: rgba(138,180,248,.1); }
+        .nfc-btn.active {
+            background: rgba(138,180,248,.12);
+            border-color: var(--positive);
+            color: var(--positive);
+            animation: nfc-pulse 2s ease-in-out infinite;
+        }
+        @keyframes nfc-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(129,201,149,.3); }
+            50% { box-shadow: 0 0 0 10px rgba(129,201,149,0); }
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 4px 0 20px;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
         .nfc-anim {
             width: 120px; height: 120px;
             margin: 0 auto 8px;
@@ -212,7 +259,16 @@
         <span class="pulse scanning">Esperando tarjeta NFC...</span>
     </div>
 
-    <div class="scan-hint">
+    <button class="nfc-btn" id="nfcBtn" onclick="startNFC()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg>
+        Escanear con NFC del celular
+    </button>
+
+    <div class="divider" id="divider" style="display:none">
+        <span>o escribe el UID manualmente</span>
+    </div>
+
+    <div class="scan-hint" id="hintDesktop">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
@@ -225,29 +281,84 @@ const API = window.location.origin + '/api';
 const input = document.getElementById('cardInput');
 const status = document.getElementById('status');
 const loginBtn = document.getElementById('loginBtn');
+const nfcBtn = document.getElementById('nfcBtn');
+const divider = document.getElementById('divider');
+const hintDesktop = document.getElementById('hintDesktop');
+let nfcReader = null;
+let nfcAbort = null;
 
 // Check if already logged in
 const session = sessionStorage.getItem('cr_user');
 if (session) window.location.href = '/';
 
-// Auto-detect rapid input (NFC reader types fast)
-let lastKey = 0;
-let buffer = '';
+// ══════════ WEB NFC (Android Chrome) ══════════
+const hasNFC = 'NDEFReader' in window;
 
+if (hasNFC) {
+    // Show NFC button, hide desktop hint
+    nfcBtn.style.display = 'flex';
+    divider.style.display = 'flex';
+    hintDesktop.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Toca el boton NFC y acerca tu tarjeta al celular';
+    // Auto-start NFC on load
+    startNFC();
+}
+
+async function startNFC() {
+    if (!hasNFC) return;
+
+    try {
+        if (nfcAbort) nfcAbort.abort();
+        nfcAbort = new AbortController();
+        nfcReader = new NDEFReader();
+
+        await nfcReader.scan({ signal: nfcAbort.signal });
+
+        nfcBtn.classList.add('active');
+        nfcBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg> NFC activo — acerca tu tarjeta';
+        showStatus('NFC listo. Acerca tu tarjeta al celular...', 'scanning');
+
+        nfcReader.addEventListener('reading', ({ serialNumber }) => {
+            if (serialNumber && serialNumber !== '') {
+                // Convert serial number format: xx:xx:xx:xx → XX:XX:XX:XX
+                const uid = serialNumber.toUpperCase();
+                input.value = uid;
+                showStatus('Tarjeta detectada: ' + uid, 'success');
+                // Auto-login
+                doLoginWithUID(uid);
+            }
+        });
+
+        nfcReader.addEventListener('readingerror', () => {
+            showStatus('Error al leer tarjeta. Intenta de nuevo.', 'error');
+        });
+
+    } catch (err) {
+        if (err.name === 'AbortError') return;
+        if (err.name === 'NotAllowedError') {
+            showStatus('Permiso NFC denegado. Activa NFC en ajustes.', 'error');
+            nfcBtn.classList.remove('active');
+            nfcBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg> Reintentar NFC';
+        } else {
+            showStatus('NFC no disponible: ' + err.message, 'error');
+        }
+    }
+}
+
+// ══════════ KEYBOARD / USB READER ══════════
 input.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
         e.preventDefault();
         doLogin();
-        return;
     }
 });
 
-// Focus input always
-document.addEventListener('click', () => input.focus());
+document.addEventListener('click', e => {
+    if (!e.target.closest('button')) input.focus();
+});
 input.focus();
 
-async function doLogin() {
-    const uid = input.value.trim();
+// ══════════ LOGIN ══════════
+async function doLoginWithUID(uid) {
     if (!uid) {
         showStatus('Pasa tu tarjeta o escribe el UID', 'error');
         return;
@@ -265,6 +376,7 @@ async function doLogin() {
         const data = await res.json();
 
         if (data.ok) {
+            if (nfcAbort) nfcAbort.abort();
             showStatus('Bienvenido, ' + data.user.name, 'success');
             sessionStorage.setItem('cr_user', JSON.stringify(data.user));
             setTimeout(() => window.location.href = '/', 800);
@@ -278,6 +390,10 @@ async function doLogin() {
     }
 
     loginBtn.disabled = false;
+}
+
+function doLogin() {
+    doLoginWithUID(input.value.trim());
 }
 
 function showStatus(msg, type) {
