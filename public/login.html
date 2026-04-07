@@ -16,15 +16,18 @@
         :root {
             --bg: #111318;
             --bg-card: #1a1d23;
+            --bg-dark: #0d0f13;
             --border: #2d3039;
             --text: #e8eaed;
             --text-secondary: #bdc1c6;
             --text-muted: #9aa0a6;
+            --text-faint: #5f6368;
             --accent: #8ab4f8;
             --accent-hover: #7aa5e8;
             --negative: #f28b82;
             --positive: #81c995;
-            --radius: 12px;
+            --positive-dim: rgba(129,201,149,.15);
+            --radius: 16px;
             --shadow: 0 8px 32px rgba(0,0,0,.4);
         }
 
@@ -33,7 +36,9 @@
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             -webkit-font-smoothing: antialiased;
@@ -44,150 +49,195 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 48px 40px;
+            padding: 44px 36px;
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             box-shadow: var(--shadow);
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .login-icon {
-            width: 72px; height: 72px;
-            background: rgba(138,180,248,.1);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            margin: 0 auto 24px;
-        }
-        .login-icon svg { width: 32px; height: 32px; color: var(--accent); }
-
+        /* ───── Header ───── */
         .login-title {
-            font-size: 22px; font-weight: 700;
-            margin-bottom: 6px;
+            font-size: 20px; font-weight: 700;
+            margin-bottom: 4px;
             letter-spacing: -0.02em;
         }
         .login-sub {
-            font-size: 14px; color: var(--text-muted);
-            margin-bottom: 36px;
-            line-height: 1.5;
+            font-size: 13px; color: var(--text-muted);
+            margin-bottom: 32px;
         }
 
-        .card-input-wrap {
-            position: relative;
-            margin-bottom: 20px;
+        /* ───── NFC Big Button ───── */
+        .nfc-area {
+            margin-bottom: 28px;
         }
 
-        .card-input {
-            width: 100%;
+        .nfc-circle {
+            width: 140px; height: 140px;
+            border-radius: 50%;
+            border: 3px solid var(--border);
             background: var(--bg);
-            border: 2px solid var(--border);
-            color: var(--text);
-            padding: 16px 20px 16px 48px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-family: 'Inter', monospace;
-            letter-spacing: 0.05em;
-            outline: none;
-            transition: border-color .2s, box-shadow .2s;
-        }
-        .card-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(138,180,248,.15);
-        }
-        .card-input::placeholder { color: #5f6368; letter-spacing: 0; }
-
-        .card-input-icon {
-            position: absolute;
-            left: 16px; top: 50%; transform: translateY(-50%);
-            color: var(--text-muted);
-        }
-        .card-input-icon svg { width: 20px; height: 20px; }
-
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            background: var(--accent);
-            color: #111318;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            font-family: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
             cursor: pointer;
-            transition: background .2s;
-            margin-bottom: 16px;
+            transition: all .3s ease;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
         }
-        .login-btn:hover { background: var(--accent-hover); }
-        .login-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .nfc-circle svg {
+            width: 44px; height: 44px;
+            color: var(--text-muted);
+            transition: color .3s, transform .3s;
+        }
+        .nfc-circle span {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-faint);
+            margin-top: 6px;
+            transition: color .3s;
+        }
 
-        .status {
+        .nfc-circle:active {
+            transform: scale(.95);
+        }
+
+        /* Ripple rings around circle */
+        .nfc-circle::before,
+        .nfc-circle::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* States */
+        .nfc-area.idle .nfc-circle {
+            border-color: var(--accent);
+            background: rgba(138,180,248,.05);
+        }
+        .nfc-area.idle .nfc-circle svg { color: var(--accent); }
+        .nfc-area.idle .nfc-circle span { color: var(--accent); }
+
+        .nfc-area.scanning .nfc-circle {
+            border-color: var(--accent);
+            background: rgba(138,180,248,.08);
+            box-shadow: 0 0 0 0 rgba(138,180,248,.3);
+            animation: circle-glow 2s ease-in-out infinite;
+        }
+        .nfc-area.scanning .nfc-circle svg {
+            color: var(--accent);
+            animation: nfc-icon-pulse 1.5s ease-in-out infinite;
+        }
+        .nfc-area.scanning .nfc-circle span { color: var(--accent); }
+        .nfc-area.scanning .nfc-circle::before {
+            width: 160px; height: 160px; top: -13px; left: -13px;
+            animation: ring-out 2s ease-out infinite;
+        }
+        .nfc-area.scanning .nfc-circle::after {
+            width: 185px; height: 185px; top: -25.5px; left: -25.5px;
+            animation: ring-out 2s ease-out .6s infinite;
+        }
+
+        .nfc-area.success .nfc-circle {
+            border-color: var(--positive);
+            background: var(--positive-dim);
+        }
+        .nfc-area.success .nfc-circle svg { color: var(--positive); }
+        .nfc-area.success .nfc-circle span { color: var(--positive); }
+
+        .nfc-area.error .nfc-circle {
+            border-color: var(--negative);
+            background: rgba(242,139,130,.08);
+            animation: shake .4s ease;
+        }
+        .nfc-area.error .nfc-circle svg { color: var(--negative); }
+        .nfc-area.error .nfc-circle span { color: var(--negative); }
+
+        @keyframes circle-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(138,180,248,.2); }
+            50% { box-shadow: 0 0 20px 4px rgba(138,180,248,.15); }
+        }
+        @keyframes nfc-icon-pulse {
+            0%, 100% { transform: scale(1); opacity: .7; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+        @keyframes ring-out {
+            0% { transform: scale(.95); opacity: .5; }
+            100% { transform: scale(1.15); opacity: 0; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+
+        .nfc-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .nfc-sublabel {
+            font-size: 12px;
+            color: var(--text-faint);
+        }
+
+        /* ───── Status ───── */
+        .status-bar {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 24px;
             font-size: 13px;
-            min-height: 20px;
-            transition: all .3s;
-        }
-        .status.error { color: var(--negative); }
-        .status.success { color: var(--positive); }
-        .status.scanning { color: var(--accent); }
-
-        .pulse {
-            animation: pulse 2s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: .4; }
-            50% { opacity: 1; }
-        }
-
-        .scan-hint {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-top: 28px;
-            padding-top: 24px;
-            border-top: 1px solid var(--border);
-            color: var(--text-muted);
-            font-size: 12px;
+            min-height: 46px;
+            transition: all .3s;
         }
-        .scan-hint svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .status-bar .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-bar.idle { color: var(--text-muted); }
+        .status-bar.idle .dot { background: var(--text-faint); }
+        .status-bar.scanning { color: var(--accent); border-color: rgba(138,180,248,.2); }
+        .status-bar.scanning .dot { background: var(--accent); animation: dot-blink 1s infinite; }
+        .status-bar.success { color: var(--positive); border-color: rgba(129,201,149,.2); }
+        .status-bar.success .dot { background: var(--positive); }
+        .status-bar.error { color: var(--negative); border-color: rgba(242,139,130,.2); }
+        .status-bar.error .dot { background: var(--negative); }
 
-        .nfc-btn {
-            width: 100%;
-            padding: 14px;
-            background: transparent;
-            color: var(--accent);
-            border: 2px solid var(--accent);
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all .2s;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        .nfc-btn:hover { background: rgba(138,180,248,.1); }
-        .nfc-btn.active {
-            background: rgba(138,180,248,.12);
-            border-color: var(--positive);
-            color: var(--positive);
-            animation: nfc-pulse 2s ease-in-out infinite;
-        }
-        @keyframes nfc-pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(129,201,149,.3); }
-            50% { box-shadow: 0 0 0 10px rgba(129,201,149,0); }
+        @keyframes dot-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .3; }
         }
 
+        /* ───── Divider ───── */
         .divider {
             display: flex;
             align-items: center;
             gap: 14px;
-            margin: 4px 0 20px;
-            color: var(--text-muted);
-            font-size: 11px;
+            margin-bottom: 20px;
+            color: var(--text-faint);
+            font-size: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
+            font-weight: 600;
         }
         .divider::before, .divider::after {
             content: '';
@@ -196,176 +246,287 @@
             background: var(--border);
         }
 
-        .nfc-anim {
-            width: 120px; height: 120px;
-            margin: 0 auto 8px;
+        /* ───── Manual Input ───── */
+        .manual-section {
+            display: none;
+        }
+        .manual-section.show { display: block; }
+
+        .card-input-wrap {
             position: relative;
+            margin-bottom: 12px;
         }
-        .nfc-anim .ring {
+        .card-input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 14px 16px 14px 44px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Inter', monospace;
+            letter-spacing: 0.04em;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .card-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(138,180,248,.12);
+        }
+        .card-input::placeholder { color: var(--text-faint); letter-spacing: 0; font-family: 'Inter', sans-serif; }
+
+        .card-input-icon {
             position: absolute;
-            border: 2px solid var(--accent);
-            border-radius: 50%;
-            opacity: 0;
-            animation: nfc-ring 2.5s ease-out infinite;
+            left: 14px; top: 50%; transform: translateY(-50%);
+            color: var(--text-faint);
         }
-        .nfc-anim .ring:nth-child(1) { width: 40px; height: 40px; top: 40px; left: 40px; animation-delay: 0s; }
-        .nfc-anim .ring:nth-child(2) { width: 70px; height: 70px; top: 25px; left: 25px; animation-delay: 0.5s; }
-        .nfc-anim .ring:nth-child(3) { width: 100px; height: 100px; top: 10px; left: 10px; animation-delay: 1s; }
-        @keyframes nfc-ring {
-            0% { transform: scale(.8); opacity: .6; }
-            100% { transform: scale(1.2); opacity: 0; }
+        .card-input-icon svg { width: 18px; height: 18px; }
+
+        .login-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            color: #111318;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background .2s, opacity .2s;
         }
+        .login-btn:hover { background: var(--accent-hover); }
+        .login-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* ───── Toggle manual ───── */
+        .toggle-manual {
+            background: none; border: none;
+            color: var(--text-faint);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 8px;
+            margin-top: 16px;
+            transition: color .2s;
+        }
+        .toggle-manual:hover { color: var(--text-muted); }
+
+        /* ───── No NFC fallback (desktop) ───── */
+        .desktop-mode .nfc-area { display: none; }
+        .desktop-mode .manual-section { display: block !important; }
+        .desktop-mode .divider { display: none; }
+        .desktop-mode .toggle-manual { display: none; }
 
         @media (max-width: 480px) {
-            .login-card { padding: 36px 24px; }
-            .login-title { font-size: 20px; }
+            .login-card { padding: 36px 24px; border-radius: 14px; }
+            .nfc-circle { width: 130px; height: 130px; }
+            .nfc-circle svg { width: 38px; height: 38px; }
         }
     </style>
 </head>
 <body>
 
-<div class="login-card">
-    <div class="nfc-anim" id="nfcAnim">
-        <div class="ring"></div>
-        <div class="ring"></div>
-        <div class="ring"></div>
-    </div>
-
-    <div class="login-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="5" width="20" height="14" rx="2"/>
-            <line x1="2" y1="10" x2="22" y2="10"/>
-        </svg>
-    </div>
+<div class="login-card" id="loginCard">
 
     <h1 class="login-title">Customer Report</h1>
-    <p class="login-sub">Escanea tu tarjeta de acceso NFC para ingresar</p>
+    <p class="login-sub">Escanea tu tarjeta de acceso</p>
 
-    <div class="card-input-wrap">
-        <div class="card-input-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0110 0v4"/>
+    <!-- NFC Button Area -->
+    <div class="nfc-area idle" id="nfcArea">
+        <div class="nfc-circle" id="nfcCircle" onclick="handleNFCTap()">
+            <svg id="nfcIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M6 8.32a7.43 7.43 0 010 7.36"/>
+                <path d="M9.46 6.21a11.76 11.76 0 010 11.58"/>
+                <path d="M12.91 4.1a16.07 16.07 0 010 15.8"/>
+                <path d="M16.37 2a20.4 20.4 0 010 20"/>
             </svg>
+            <span id="nfcCircleText">NFC</span>
         </div>
-        <input type="text" class="card-input" id="cardInput"
-               placeholder="Pasa tu tarjeta..."
-               autocomplete="off" autofocus>
+        <div class="nfc-label" id="nfcLabel">Toca para activar NFC</div>
+        <div class="nfc-sublabel" id="nfcSublabel">Acerca tu tarjeta al celular</div>
     </div>
 
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">Ingresar</button>
-
-    <div class="status" id="status">
-        <span class="pulse scanning">Esperando tarjeta NFC...</span>
+    <!-- Status Bar -->
+    <div class="status-bar idle" id="statusBar">
+        <div class="dot"></div>
+        <span id="statusText">Listo para escanear</span>
     </div>
 
-    <button class="nfc-btn" id="nfcBtn" onclick="startNFC()" style="display:none">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg>
-        Escanear con NFC del celular
+    <!-- Manual Input (hidden by default on mobile) -->
+    <div class="divider"><span>o ingresa manualmente</span></div>
+
+    <div class="manual-section" id="manualSection">
+        <div class="card-input-wrap">
+            <div class="card-input-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+            </div>
+            <input type="text" class="card-input" id="cardInput"
+                   placeholder="UID de tarjeta..."
+                   autocomplete="off">
+        </div>
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">Ingresar</button>
+    </div>
+
+    <button class="toggle-manual" id="toggleManual" onclick="toggleManual()">
+        Ingresar UID manualmente
     </button>
-
-    <div class="divider" id="divider" style="display:none">
-        <span>o escribe el UID manualmente</span>
-    </div>
-
-    <div class="scan-hint" id="hintDesktop">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        Acerca tu tarjeta al lector NFC o escribe el UID manualmente
-    </div>
 </div>
 
 <script>
 const API = window.location.origin + '/api';
 const input = document.getElementById('cardInput');
-const status = document.getElementById('status');
+const statusBar = document.getElementById('statusBar');
+const statusText = document.getElementById('statusText');
 const loginBtn = document.getElementById('loginBtn');
-const nfcBtn = document.getElementById('nfcBtn');
-const divider = document.getElementById('divider');
-const hintDesktop = document.getElementById('hintDesktop');
+const nfcArea = document.getElementById('nfcArea');
+const nfcLabel = document.getElementById('nfcLabel');
+const nfcSublabel = document.getElementById('nfcSublabel');
+const nfcCircleText = document.getElementById('nfcCircleText');
+const nfcIcon = document.getElementById('nfcIcon');
+const manualSection = document.getElementById('manualSection');
+const toggleManualBtn = document.getElementById('toggleManual');
+const loginCard = document.getElementById('loginCard');
+
 let nfcReader = null;
 let nfcAbort = null;
+let nfcActive = false;
 
 // Check if already logged in
-const session = sessionStorage.getItem('cr_user');
-if (session) window.location.href = '/';
+if (sessionStorage.getItem('cr_user')) window.location.href = '/';
 
-// ══════════ WEB NFC (Android Chrome) ══════════
+// ══════════ DETECT NFC SUPPORT ══════════
 const hasNFC = 'NDEFReader' in window;
 
-if (hasNFC) {
-    // Show NFC button, hide desktop hint
-    nfcBtn.style.display = 'flex';
-    divider.style.display = 'flex';
-    hintDesktop.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Toca el boton NFC y acerca tu tarjeta al celular';
-    // Auto-start NFC on load
-    startNFC();
+if (!hasNFC) {
+    // Desktop mode: show input directly, hide NFC circle
+    loginCard.classList.add('desktop-mode');
+    input.autofocus = true;
+    input.focus();
+    setStatus('Pasa tu tarjeta por el lector', 'idle');
 }
 
-async function startNFC() {
+// ══════════ NFC BUTTON TAP ══════════
+async function handleNFCTap() {
     if (!hasNFC) return;
 
+    if (nfcActive) {
+        // Already scanning, do nothing
+        return;
+    }
+
     try {
+        // Clean previous
         if (nfcAbort) nfcAbort.abort();
         nfcAbort = new AbortController();
         nfcReader = new NDEFReader();
 
+        // This triggers the permission prompt on first use
         await nfcReader.scan({ signal: nfcAbort.signal });
+        nfcActive = true;
 
-        nfcBtn.classList.add('active');
-        nfcBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg> NFC activo — acerca tu tarjeta';
-        showStatus('NFC listo. Acerca tu tarjeta al celular...', 'scanning');
+        // UI: scanning state
+        nfcArea.className = 'nfc-area scanning';
+        nfcLabel.textContent = 'Buscando tarjeta...';
+        nfcSublabel.textContent = 'Acerca tu tarjeta NFC al celular';
+        nfcCircleText.textContent = 'LEYENDO';
+        setStatus('NFC activo — acerca tu tarjeta', 'scanning');
+
+        // Vibrate to confirm NFC started
+        if (navigator.vibrate) navigator.vibrate(50);
 
         nfcReader.addEventListener('reading', ({ serialNumber }) => {
-            if (serialNumber && serialNumber !== '') {
-                // Convert serial number format: xx:xx:xx:xx → XX:XX:XX:XX
-                const uid = serialNumber.toUpperCase();
-                input.value = uid;
-                showStatus('Tarjeta detectada: ' + uid, 'success');
-                // Auto-login
-                doLoginWithUID(uid);
-            }
+            if (!serialNumber || serialNumber === '') return;
+
+            const uid = serialNumber.toUpperCase();
+
+            // Vibrate on read
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+            // UI: success momentarily
+            nfcArea.className = 'nfc-area success';
+            nfcLabel.textContent = 'Tarjeta detectada';
+            nfcSublabel.textContent = uid;
+            nfcCircleText.textContent = '';
+            nfcIcon.innerHTML = '<polyline points="20 6 9 17 4 12" stroke="currentColor" stroke-width="2.5" fill="none"/>';
+
+            input.value = uid;
+            setStatus('Tarjeta leida: ' + uid, 'success');
+
+            // Auto-login
+            doLoginWithUID(uid);
         });
 
         nfcReader.addEventListener('readingerror', () => {
-            showStatus('Error al leer tarjeta. Intenta de nuevo.', 'error');
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            setNFCError('No se pudo leer. Intenta de nuevo.');
         });
 
     } catch (err) {
+        nfcActive = false;
         if (err.name === 'AbortError') return;
+
         if (err.name === 'NotAllowedError') {
-            showStatus('Permiso NFC denegado. Activa NFC en ajustes.', 'error');
-            nfcBtn.classList.remove('active');
-            nfcBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/></svg> Reintentar NFC';
+            setNFCError('Permiso NFC denegado');
+            nfcSublabel.textContent = 'Activa NFC en ajustes del celular';
+        } else if (err.name === 'NotSupportedError') {
+            setNFCError('NFC no soportado');
+            nfcSublabel.textContent = 'Usa Chrome en Android';
         } else {
-            showStatus('NFC no disponible: ' + err.message, 'error');
+            setNFCError(err.message);
         }
     }
 }
 
-// ══════════ KEYBOARD / USB READER ══════════
+function setNFCError(msg) {
+    nfcArea.className = 'nfc-area error';
+    nfcLabel.textContent = msg;
+    nfcCircleText.textContent = 'NFC';
+    setStatus(msg, 'error');
+    // Reset to idle after 3s
+    setTimeout(() => {
+        if (nfcArea.classList.contains('error')) {
+            resetNFCIdle();
+        }
+    }, 3000);
+}
+
+function resetNFCIdle() {
+    nfcActive = false;
+    nfcArea.className = 'nfc-area idle';
+    nfcLabel.textContent = 'Toca para activar NFC';
+    nfcSublabel.textContent = 'Acerca tu tarjeta al celular';
+    nfcCircleText.textContent = 'NFC';
+    nfcIcon.innerHTML = '<path d="M6 8.32a7.43 7.43 0 010 7.36"/><path d="M9.46 6.21a11.76 11.76 0 010 11.58"/><path d="M12.91 4.1a16.07 16.07 0 010 15.8"/><path d="M16.37 2a20.4 20.4 0 010 20"/>';
+    setStatus('Listo para escanear', 'idle');
+}
+
+// ══════════ MANUAL INPUT ══════════
+function toggleManual() {
+    const shown = manualSection.classList.toggle('show');
+    toggleManualBtn.textContent = shown ? 'Ocultar entrada manual' : 'Ingresar UID manualmente';
+    if (shown) input.focus();
+}
+
 input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        doLogin();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
 });
 
-document.addEventListener('click', e => {
-    if (!e.target.closest('button')) input.focus();
-});
-input.focus();
+// Desktop: always focus input
+if (!hasNFC) {
+    document.addEventListener('click', e => {
+        if (!e.target.closest('button') && !e.target.closest('input')) input.focus();
+    });
+}
 
 // ══════════ LOGIN ══════════
 async function doLoginWithUID(uid) {
-    if (!uid) {
-        showStatus('Pasa tu tarjeta o escribe el UID', 'error');
-        return;
-    }
+    if (!uid) { setStatus('Pasa tu tarjeta', 'error'); return; }
 
     loginBtn.disabled = true;
-    showStatus('Verificando...', 'scanning');
+    setStatus('Verificando...', 'scanning');
 
     try {
         const res = await fetch(API + '/auth/login', {
@@ -377,16 +538,22 @@ async function doLoginWithUID(uid) {
 
         if (data.ok) {
             if (nfcAbort) nfcAbort.abort();
-            showStatus('Bienvenido, ' + data.user.name, 'success');
+            setStatus('Bienvenido, ' + data.user.name, 'success');
+
+            if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
+
             sessionStorage.setItem('cr_user', JSON.stringify(data.user));
-            setTimeout(() => window.location.href = '/', 800);
+            setTimeout(() => window.location.href = '/', 600);
         } else {
-            showStatus(data.error || 'Tarjeta no reconocida', 'error');
+            setStatus(data.error || 'Tarjeta no reconocida', 'error');
+            if (hasNFC) {
+                setNFCError('Tarjeta no registrada');
+                nfcSublabel.textContent = 'Contacta al administrador';
+            }
             input.value = '';
-            input.focus();
         }
     } catch (err) {
-        showStatus('Error de conexion', 'error');
+        setStatus('Error de conexion', 'error');
     }
 
     loginBtn.disabled = false;
@@ -396,11 +563,9 @@ function doLogin() {
     doLoginWithUID(input.value.trim());
 }
 
-function showStatus(msg, type) {
-    status.className = 'status ' + type;
-    status.innerHTML = type === 'scanning'
-        ? '<span class="pulse scanning">' + msg + '</span>'
-        : msg;
+function setStatus(msg, type) {
+    statusBar.className = 'status-bar ' + type;
+    statusText.textContent = msg;
 }
 </script>
 </body>
