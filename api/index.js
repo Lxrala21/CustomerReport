@@ -4,22 +4,23 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
-const PORT = 3600;
 
 // ── MongoDB Atlas ──
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://Lxrala:Larala21@finanzasmit.qth6nlx.mongodb.net/customerreport_db?retryWrites=true&w=majority&appName=FinanzasMIT';
+const MONGO_URI = process.env.MONGO_URI;
+let isConnected = false;
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('MongoDB Atlas conectado — customerreport_db'))
-    .catch(err => console.error('Error MongoDB:', err.message));
+async function connectDB() {
+    if (isConnected) return;
+    await mongoose.connect(MONGO_URI);
+    isConnected = true;
+    console.log('MongoDB Atlas conectado — customerreport_db');
+}
 
 // ── Middleware ──
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname)));
 
 // ── Schema reutilizable para customers ──
 const customerFields = {
@@ -52,41 +53,48 @@ const TABS = {
     notassigned: { name: 'Not Assigned',     collection: 'notassigned' },
 };
 
-// Crear modelos dinámicamente
+// Crear modelos dinámicamente (evitar recompilación en serverless)
 const models = {};
 Object.entries(TABS).forEach(([key, tab]) => {
-    const schema = new mongoose.Schema(customerFields, { ...schemaOpts, collection: tab.collection });
-    models[key] = mongoose.model(tab.collection, schema);
+    if (mongoose.models[tab.collection]) {
+        models[key] = mongoose.models[tab.collection];
+    } else {
+        const schema = new mongoose.Schema(customerFields, { ...schemaOpts, collection: tab.collection });
+        models[key] = mongoose.model(tab.collection, schema);
+    }
 });
 
 // ── Schema: Import metadata ──
-const importSchema = new mongoose.Schema({
+const Import = mongoose.models.Import || mongoose.model('Import', new mongoose.Schema({
     reportTitle: { type: String, default: '' },
-    tabs: [{
-        tab: String,
-        count: Number,
-    }],
+    tabs: [{ tab: String, count: Number }],
     totalRecords: { type: Number, default: 0 },
     importedAt: { type: Date, default: Date.now },
-}, schemaOpts);
-
-const Import = mongoose.model('Import', importSchema);
+}, schemaOpts));
 
 // ── Schema: Weekly snapshots ──
-const snapshotSchema = new mongoose.Schema({
+const Snapshot = mongoose.models.Snapshot || mongoose.model('Snapshot', new mongoose.Schema({
     date:      { type: Date, required: true },
     label:     { type: String, default: '' },
     bought:    { type: Number, default: 0 },
     paid:      { type: Number, default: 0 },
     balance:   { type: Number, default: 0 },
     clients:   { type: Number, default: 0 },
-}, { ...schemaOpts, collection: 'snapshots' });
+}, { ...schemaOpts, collection: 'snapshots' }));
 
-const Snapshot = mongoose.model('Snapshot', snapshotSchema);
+// ── Conectar DB antes de cada request ──
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        res.status(500).json({ ok: false, error: 'DB connection failed: ' + err.message });
+    }
+});
 
 // ── Routes ──
 
-// GET /api/customers — Cargar todos (rawdata) - backward compatible
+// GET /api/customers
 app.get('/api/customers', async (req, res) => {
     try {
         const customers = await models.rawdata.find().lean();
@@ -97,7 +105,7 @@ app.get('/api/customers', async (req, res) => {
     }
 });
 
-// GET /api/tab/:tab — Cargar datos de una pestaña específica
+// GET /api/tab/:tab
 app.get('/api/tab/:tab', async (req, res) => {
     try {
         const tab = req.params.tab;
@@ -110,7 +118,7 @@ app.get('/api/tab/:tab', async (req, res) => {
     }
 });
 
-// GET /api/tabs — Info de todas las pestañas
+// GET /api/tabs
 app.get('/api/tabs', async (req, res) => {
     try {
         const result = {};
@@ -125,19 +133,17 @@ app.get('/api/tabs', async (req, res) => {
     }
 });
 
-// POST /api/import — Importar datos (reemplaza todos) - backward compatible
+// POST /api/import
 app.post('/api/import', async (req, res) => {
     try {
         const { customers, reportTitle } = req.body;
         if (!customers || !Array.isArray(customers)) {
             return res.status(400).json({ ok: false, error: 'Se requiere array de customers' });
         }
-
         await models.rawdata.deleteMany({});
         if (customers.length > 0) {
             await models.rawdata.insertMany(customers, { ordered: false });
         }
-
         await Import.deleteMany({});
         await Import.create({
             reportTitle: reportTitle || '',
@@ -145,38 +151,31 @@ app.post('/api/import', async (req, res) => {
             totalRecords: customers.length,
             importedAt: new Date(),
         });
-
-        console.log(`Importados ${customers.length} clientes en rawdata`);
         res.json({ ok: true, count: customers.length });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// POST /api/import-all — Importar todas las pestañas de golpe
+// POST /api/import-all
 app.post('/api/import-all', async (req, res) => {
     try {
         const { tabs: tabsData, reportTitle } = req.body;
         if (!tabsData || typeof tabsData !== 'object') {
             return res.status(400).json({ ok: false, error: 'Se requiere objeto tabs con arrays' });
         }
-
         const tabCounts = [];
         let totalRecords = 0;
-
         for (const [key, data] of Object.entries(tabsData)) {
             if (!models[key]) continue;
             if (!Array.isArray(data)) continue;
-
             await models[key].deleteMany({});
             if (data.length > 0) {
                 await models[key].insertMany(data, { ordered: false });
             }
             tabCounts.push({ tab: key, count: data.length });
             totalRecords += data.length;
-            console.log(`  ${TABS[key].name}: ${data.length} registros`);
         }
-
         await Import.deleteMany({});
         await Import.create({
             reportTitle: reportTitle || '',
@@ -184,15 +183,13 @@ app.post('/api/import-all', async (req, res) => {
             totalRecords,
             importedAt: new Date(),
         });
-
-        console.log(`Import completo: ${tabCounts.length} pestañas, ${totalRecords} registros total`);
         res.json({ ok: true, tabs: tabCounts, totalRecords });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// GET /api/status — Estado de la base de datos
+// GET /api/status
 app.get('/api/status', async (req, res) => {
     try {
         const tabCounts = {};
@@ -213,19 +210,15 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
-// POST /api/snapshot — Guardar snapshot semanal
+// POST /api/snapshot
 app.post('/api/snapshot', async (req, res) => {
     try {
         const { date, label, bought, paid, balance, clients } = req.body;
         const snapDate = new Date(date);
-        // Normalizar a inicio del día para evitar duplicados del mismo día
         snapDate.setHours(0, 0, 0, 0);
-
-        // Upsert: si ya existe uno de ese día, actualizar
         const existing = await Snapshot.findOne({
             date: { $gte: snapDate, $lt: new Date(snapDate.getTime() + 86400000) }
         });
-
         if (existing) {
             existing.label = label || existing.label;
             existing.bought = bought;
@@ -233,11 +226,9 @@ app.post('/api/snapshot', async (req, res) => {
             existing.balance = balance;
             existing.clients = clients;
             await existing.save();
-            console.log(`Snapshot actualizado: ${label}`);
             res.json({ ok: true, updated: true });
         } else {
             await Snapshot.create({ date: snapDate, label, bought, paid, balance, clients });
-            console.log(`Snapshot creado: ${label}`);
             res.json({ ok: true, created: true });
         }
     } catch (err) {
@@ -245,7 +236,7 @@ app.post('/api/snapshot', async (req, res) => {
     }
 });
 
-// GET /api/snapshots — Obtener todos los snapshots ordenados por fecha
+// GET /api/snapshots
 app.get('/api/snapshots', async (req, res) => {
     try {
         const data = await Snapshot.find().sort({ date: 1 }).lean();
@@ -255,7 +246,7 @@ app.get('/api/snapshots', async (req, res) => {
     }
 });
 
-// DELETE /api/snapshot/:id — Eliminar un snapshot
+// DELETE /api/snapshot/:id
 app.delete('/api/snapshot/:id', async (req, res) => {
     try {
         await Snapshot.findByIdAndDelete(req.params.id);
@@ -265,7 +256,4 @@ app.delete('/api/snapshot/:id', async (req, res) => {
     }
 });
 
-// ── Start ──
-app.listen(PORT, () => {
-    console.log(`Server: http://localhost:${PORT}`);
-});
+module.exports = app;
