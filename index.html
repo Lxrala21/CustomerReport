@@ -2,8 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Customer Report</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1d23">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CustReport">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -59,7 +65,10 @@
             min-height: 100vh;
             line-height: 1.55;
             padding-bottom: 48px;
+            padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
             -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-text-size-adjust: 100%;
         }
 
         /* ───────── Header ───────── */
@@ -391,9 +400,13 @@
             background: var(--bg-tab-bar);
             border-top: 1px solid var(--border);
             display: flex; align-items: stretch;
-            height: 42px; padding: 0 16px;
+            height: 42px;
+            height: calc(42px + env(safe-area-inset-bottom, 0px));
+            padding: 0 16px;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
             gap: 0; overflow-x: auto;
             box-shadow: 0 -1px 4px rgba(0,0,0,.03);
+            -webkit-overflow-scrolling: touch;
         }
         .sheet-tab {
             padding: 0 20px;
@@ -565,12 +578,135 @@
             .sections { grid-template-columns: 1fr; }
             .tab-dash { grid-template-columns: 1fr; }
         }
+
         @media (max-width: 768px) {
-            .header { padding: 0 16px; }
-            .main { padding: 20px 16px; }
-            .kpi-row { grid-template-columns: 1fr 1fr; gap: 12px; }
-            .toolbar { gap: 8px; }
-            .search { width: 100%; }
+            .header {
+                padding: 8px 12px;
+                height: auto;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .h-left { gap: 10px; }
+            .h-logo { width: 28px; height: 28px; }
+            .h-title { font-size: 13px; }
+            .h-sub { font-size: 10.5px; }
+            .h-right {
+                width: 100%;
+                justify-content: space-between;
+                gap: 8px;
+            }
+            .h-right .btn { font-size: 12px; padding: 6px 12px; flex: 1; justify-content: center; }
+            .h-date { font-size: 10px !important; }
+
+            .main { padding: 16px 12px; }
+
+            .kpi-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+            .kpi { padding: 14px 14px; }
+            .kpi-val { font-size: 20px; }
+            .kpi-lb { font-size: 10px; }
+            .kpi-ic { width: 30px; height: 30px; }
+            .kpi-ic svg { width: 13px; height: 13px; }
+            .kpi-sub { font-size: 11px; }
+
+            .toolbar {
+                gap: 6px;
+                margin-bottom: 16px;
+            }
+            .toolbar .tg { width: 100%; }
+            .toolbar input[type="date"] { width: 100%; }
+            .toolbar .search { width: 100%; }
+            .toolbar select { width: 100%; }
+            .toolbar .btn { width: 100%; justify-content: center; }
+            .tsep { display: none; }
+            .tl { font-size: 10px; }
+
+            .sections { gap: 12px; margin-bottom: 20px; }
+            .card-h { padding: 12px 14px; }
+            .card-t { font-size: 12.5px; }
+            .card-s { font-size: 10.5px; }
+
+            .mt th, .mt td { padding: 8px 12px; font-size: 12px; }
+            .mt th { font-size: 9.5px; }
+
+            .t5-row {
+                grid-template-columns: 28px 1fr 100px;
+                gap: 8px;
+                padding: 10px 14px;
+            }
+            .t5-pct { display: none; }
+            .t5-name { font-size: 12px; }
+            .t5-val { font-size: 12.5px; }
+            .t5-company { font-size: 10.5px; }
+
+            .table-h { padding: 12px 14px; flex-direction: column; align-items: flex-start; }
+            .table-title { font-size: 12.5px; }
+            table.dt { min-width: 700px; font-size: 12px; }
+            .dt th { padding: 8px 10px; font-size: 9.5px; }
+            .dt td { padding: 8px 10px; }
+            .dt .cname { max-width: 120px; }
+
+            .pag { padding: 10px 14px; gap: 1px; }
+            .pag button { width: 28px; height: 28px; font-size: 12px; }
+            .pg-info { font-size: 11px; }
+
+            .tab-kpi { padding: 12px 14px; }
+            .tk-label { font-size: 10px; }
+            .tk-value { font-size: 17px; }
+            .tk-sub { font-size: 10.5px; }
+            .tk-badge { font-size: 10px; padding: 2px 8px; }
+
+            .tab-chart-card { padding: 14px; }
+            .tab-chart-wrap { min-height: 180px; }
+
+            .chart-container { padding: 14px !important; min-height: 240px !important; }
+            .chart-legend { gap: 12px; flex-wrap: wrap; }
+            .chart-legend-item { font-size: 10.5px; }
+
+            .drop-box { padding: 40px 30px; }
+            .drop-box h3 { font-size: 14px; }
+            .drop-box p { font-size: 12px; }
+
+            .empty { padding: 50px 16px; }
+            .empty h3 { font-size: 14px; }
+            .empty p { font-size: 12px; }
+
+            .toast { bottom: 52px; right: 12px; left: 12px; font-size: 12px; padding: 10px 14px; }
+
+            .sheet-bar {
+                height: 44px;
+                padding: 0 8px;
+                -webkit-overflow-scrolling: touch;
+            }
+            .sheet-tab {
+                padding: 0 14px;
+                font-size: 11.5px;
+                min-height: 44px;
+            }
+            .sheet-tab .tab-count { font-size: 9.5px; padding: 1px 6px; }
+
+            body { padding-bottom: 52px; }
+        }
+
+        @media (max-width: 420px) {
+            .kpi-row { grid-template-columns: 1fr; gap: 8px; }
+            .kpi {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 14px;
+            }
+            .kpi-top { margin-bottom: 0; flex-direction: row-reverse; gap: 10px; }
+            .kpi-val { font-size: 18px; }
+            .kpi-sub { display: none; }
+            .kpi-ic { width: 28px; height: 28px; }
+
+            .h-right .btn span { display: none; }
+
+            .t5-row { grid-template-columns: 28px 1fr 90px; }
         }
     </style>
 </head>
@@ -654,7 +790,7 @@
                     <button class="btn btn-g" onclick="setMainChart('donut')" id="btnChartDonut" style="font-size:11px;padding:4px 10px">Dona</button>
                 </div>
             </div>
-            <div style="padding:24px;position:relative;min-height:320px">
+            <div class="chart-container" style="padding:24px;position:relative;min-height:320px">
                 <canvas id="mainChart"></canvas>
             </div>
         </div>
@@ -662,7 +798,7 @@
             <div class="card-h">
                 <div><span class="card-t">Por Representante</span><div class="card-s">Comprado vs Cobrado vs Pendiente por SR1</div></div>
             </div>
-            <div style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
+            <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
                 <canvas id="srChart"></canvas>
             </div>
         </div>
@@ -2293,6 +2429,11 @@ function toast(msg,type='info'){
     t.classList.add('show');
     clearTimeout(t._t);
     t._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
 }
 </script>
 </body>
