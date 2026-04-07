@@ -400,31 +400,48 @@
             background: var(--bg-tab-bar);
             border-top: 1px solid var(--border);
             display: flex; align-items: stretch;
-            height: 42px;
-            height: calc(42px + env(safe-area-inset-bottom, 0px));
-            padding: 0 16px;
+            height: 46px;
+            height: calc(46px + env(safe-area-inset-bottom, 0px));
+            padding: 0 12px;
             padding-bottom: env(safe-area-inset-bottom, 0px);
             gap: 0; overflow-x: auto;
-            box-shadow: 0 -1px 4px rgba(0,0,0,.03);
+            box-shadow: 0 -2px 8px rgba(0,0,0,.05);
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .sheet-bar::-webkit-scrollbar { display: none; }
+        .sheet-bar-track {
+            display: flex; align-items: stretch;
+            position: relative;
+            min-width: 100%;
+        }
+        .sheet-slider {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 3px 3px 0 0;
+            transition: left .3s cubic-bezier(.4,0,.2,1), width .3s cubic-bezier(.4,0,.2,1);
+            z-index: 2;
         }
         .sheet-tab {
-            padding: 0 20px;
+            padding: 0 18px;
             font-size: 12.5px; font-weight: 500;
             color: var(--text-muted);
             background: transparent;
             border: none; cursor: pointer;
             font-family: inherit;
-            border-top: 2px solid transparent;
-            transition: all .15s;
+            border-top: none;
+            transition: color .2s, background .15s;
             white-space: nowrap;
             display: flex; align-items: center; gap: 7px;
+            position: relative;
+            flex-shrink: 0;
         }
         .sheet-tab:hover { color: var(--text-secondary); background: var(--bg-hover); }
         .sheet-tab.active {
             color: var(--text);
-            border-top-color: var(--accent);
-            background: var(--bg-tab-active);
+            background: transparent;
             font-weight: 600;
         }
         .sheet-tab .tab-count {
@@ -432,6 +449,7 @@
             background: var(--neutral-bg); color: var(--text-muted);
             padding: 1px 7px; border-radius: 10px;
             min-width: 22px; text-align: center;
+            transition: background .2s, color .2s;
         }
         .sheet-tab.active .tab-count {
             background: var(--accent); color: #fff;
@@ -677,16 +695,17 @@
             .toast { bottom: 52px; right: 12px; left: 12px; font-size: 12px; padding: 10px 14px; }
 
             .sheet-bar {
-                height: 44px;
-                padding: 0 8px;
-                -webkit-overflow-scrolling: touch;
+                height: 48px;
+                height: calc(48px + env(safe-area-inset-bottom, 0px));
+                padding: 0 6px;
             }
             .sheet-tab {
                 padding: 0 14px;
                 font-size: 11.5px;
-                min-height: 44px;
+                min-height: 48px;
             }
             .sheet-tab .tab-count { font-size: 9.5px; padding: 1px 6px; }
+            .sheet-slider { height: 3px; }
 
             body { padding-bottom: 52px; }
         }
@@ -1006,24 +1025,27 @@
 
 <!-- ═══════════ SHEET TAB BAR ═══════════ -->
 <nav class="sheet-bar" id="sheetBar">
-    <button class="sheet-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
-        <span class="tab-dot" style="background:var(--accent)"></span> Dashboard
-    </button>
-    <button class="sheet-tab" data-tab="rawdata" onclick="switchTab('rawdata')">
-        Raw Data <span class="tab-count" id="tcRaw">0</span>
-    </button>
-    <button class="sheet-tab" data-tab="balance" onclick="switchTab('balance')">
-        Balance Details <span class="tab-count" id="tcBalance">0</span>
-    </button>
-    <button class="sheet-tab" data-tab="employees" onclick="switchTab('employees')">
-        Employees <span class="tab-count" id="tcEmployees">0</span>
-    </button>
-    <button class="sheet-tab" data-tab="lorena" onclick="switchTab('lorena')">
-        Lorena <span class="tab-count" id="tcLorena">0</span>
-    </button>
-    <button class="sheet-tab" data-tab="notassigned" onclick="switchTab('notassigned')">
-        Not Assigned <span class="tab-count" id="tcNotassigned">0</span>
-    </button>
+    <div class="sheet-bar-track" id="sheetTrack">
+        <div class="sheet-slider" id="sheetSlider"></div>
+        <button class="sheet-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+            <span class="tab-dot" style="background:var(--accent)"></span> Dashboard
+        </button>
+        <button class="sheet-tab" data-tab="rawdata" onclick="switchTab('rawdata')">
+            Raw Data <span class="tab-count" id="tcRaw">0</span>
+        </button>
+        <button class="sheet-tab" data-tab="balance" onclick="switchTab('balance')">
+            Balance Details <span class="tab-count" id="tcBalance">0</span>
+        </button>
+        <button class="sheet-tab" data-tab="employees" onclick="switchTab('employees')">
+            Employees <span class="tab-count" id="tcEmployees">0</span>
+        </button>
+        <button class="sheet-tab" data-tab="lorena" onclick="switchTab('lorena')">
+            Lorena <span class="tab-count" id="tcLorena">0</span>
+        </button>
+        <button class="sheet-tab" data-tab="notassigned" onclick="switchTab('notassigned')">
+            Not Assigned <span class="tab-count" id="tcNotassigned">0</span>
+        </button>
+    </div>
 </nav>
 
 <!-- Drop overlay -->
@@ -1079,15 +1101,62 @@ document.getElementById('page-dashboard').classList.remove('active');
 TABS.forEach(t => { tabState[t] = { filtered:[], sortCol:'balance', sortDir:'desc', page:1 }; });
 
 // ══════════ TAB SWITCHING ══════════
+const TAB_ORDER = ['dashboard','rawdata','balance','employees','lorena','notassigned'];
+
+function moveSlider(tabBtn) {
+    const slider = document.getElementById('sheetSlider');
+    const bar = document.getElementById('sheetBar');
+    const track = document.getElementById('sheetTrack');
+    if (!slider || !tabBtn) return;
+    const trackRect = track.getBoundingClientRect();
+    const btnRect = tabBtn.getBoundingClientRect();
+    slider.style.width = btnRect.width + 'px';
+    slider.style.left = (btnRect.left - trackRect.left) + 'px';
+    // Auto-scroll tab into view
+    const barRect = bar.getBoundingClientRect();
+    const btnCenter = btnRect.left + btnRect.width / 2;
+    const barCenter = barRect.left + barRect.width / 2;
+    const offset = btnCenter - barCenter;
+    bar.scrollBy({ left: offset, behavior: 'smooth' });
+}
+
 function switchTab(tab) {
     if (!hasData && tab !== 'dashboard') return;
     activeTab = tab;
     document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.sheet-tab').forEach(b => b.classList.remove('active'));
     document.getElementById('page-' + tab).classList.add('active');
-    document.querySelector(`.sheet-tab[data-tab="${tab}"]`).classList.add('active');
+    const activeBtn = document.querySelector(`.sheet-tab[data-tab="${tab}"]`);
+    activeBtn.classList.add('active');
+    moveSlider(activeBtn);
     if (tab !== 'dashboard' && hasData) applyTabFilters(tab);
 }
+
+// Init slider position
+window.addEventListener('load', () => {
+    setTimeout(() => moveSlider(document.querySelector('.sheet-tab.active')), 100);
+});
+window.addEventListener('resize', () => moveSlider(document.querySelector('.sheet-tab.active')));
+
+// ══════════ SWIPE GESTURE ══════════
+(function() {
+    let startX = 0, startY = 0, swiping = false;
+    document.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        swiping = true;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+        if (!swiping) return;
+        swiping = false;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return;
+        const idx = TAB_ORDER.indexOf(activeTab);
+        if (dx < 0 && idx < TAB_ORDER.length - 1) switchTab(TAB_ORDER[idx + 1]);
+        else if (dx > 0 && idx > 0) switchTab(TAB_ORDER[idx - 1]);
+    }, { passive: true });
+})();
 
 // ══════════ FILE HANDLING ══════════
 document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files.length) processFile(e.target.files[0]); });
