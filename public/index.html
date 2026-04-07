@@ -58,6 +58,64 @@
             --radius-lg: 12px;
         }
 
+        [data-theme="dark"] {
+            --white: #1a1d23;
+            --bg: #111318;
+            --bg-card: #1a1d23;
+            --bg-hover: #22252d;
+            --bg-input: #22252d;
+            --bg-header: #1a1d23;
+            --bg-thead: #1e2129;
+            --bg-tab-bar: #1a1d23;
+            --bg-tab-active: #22252d;
+
+            --border: #2d3039;
+            --border-light: #252830;
+
+            --text: #e8eaed;
+            --text-secondary: #bdc1c6;
+            --text-muted: #9aa0a6;
+            --text-faint: #5f6368;
+
+            --accent: #8ab4f8;
+            --accent-light: #aecbfa;
+
+            --positive: #81c995;
+            --positive-bg: #1b3326;
+            --negative: #f28b82;
+            --negative-bg: #3c2020;
+            --warning: #fdd663;
+            --warning-bg: #3e3214;
+            --info: #8ab4f8;
+            --info-bg: #1e2a3e;
+            --neutral: #9aa0a6;
+            --neutral-bg: #2d3039;
+
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.2);
+            --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+            --shadow-md: 0 4px 12px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+        }
+
+        /* ───────── Dark Mode Toggle ───────── */
+        .theme-toggle {
+            width: 36px; height: 36px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .2s;
+            flex-shrink: 0;
+        }
+        .theme-toggle:hover { background: var(--bg-hover); color: var(--text); border-color: #aab0b8; }
+        .theme-toggle svg { width: 16px; height: 16px; }
+        .theme-toggle .icon-moon,
+        [data-theme="dark"] .theme-toggle .icon-sun { display: none; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: block; }
+        .theme-toggle .icon-sun { display: block; }
+        [data-theme="dark"] .theme-toggle { border-color: #3d4149; }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg);
@@ -589,6 +647,9 @@
             border-color: var(--accent);
         }
         .btn-g.chart-active:hover { background: #2d3345; }
+        [data-theme="dark"] .btn-g.chart-active { background: var(--accent); color: #111318; }
+        [data-theme="dark"] .btn-p { background: var(--accent); color: #111318; border-color: var(--accent); }
+        [data-theme="dark"] .btn-p:hover { background: #7aa5e8; border-color: #7aa5e8; }
 
         /* ───────── Responsive ───────── */
         @media (max-width: 1100px) {
@@ -750,6 +811,10 @@
         <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
         <span class="h-date" id="dbStatus" style="font-size:11px"></span>
         <span class="h-date" id="headerDate"></span>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
     </div>
 </header>
 
@@ -1099,6 +1164,20 @@ document.getElementById('headerDate').textContent = new Date().toLocaleDateStrin
 document.getElementById('page-empty').classList.add('active');
 document.getElementById('page-dashboard').classList.remove('active');
 TABS.forEach(t => { tabState[t] = { filtered:[], sortCol:'balance', sortDir:'desc', page:1 }; });
+
+// ══════════ THEME COLORS HELPER ══════════
+function getThemeColor(varName) {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+function isDarkMode() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+function updateChartsTheme() {
+    if (hasData && activeTab === 'dashboard') {
+        drawMainChart();
+        drawSRChart(allData || []);
+    }
+}
 
 // ══════════ TAB SWITCHING ══════════
 const TAB_ORDER = ['dashboard','rawdata','balance','employees','lorena','notassigned'];
@@ -1971,9 +2050,9 @@ function drawLineChart(canvasId, snapshots) {
         const ctx = canvas.getContext('2d');
         ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#9aa0a6'; ctx.font = '500 14px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '500 14px Inter, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('Importa un Excel para crear el primer punto de la grafica', w / 2, h / 2 - 10);
-        ctx.fillStyle = '#bdc1c6'; ctx.font = '400 12px Inter, sans-serif';
+        ctx.fillStyle = getThemeColor('--text-faint'); ctx.font = '400 12px Inter, sans-serif';
         ctx.fillText('Cada importacion genera un punto semanal', w / 2, h / 2 + 12);
         ctx.restore();
         return;
@@ -2013,16 +2092,16 @@ function drawLineChart(canvasId, snapshots) {
         for (let i = 0; i <= 4; i++) {
             const y = padT + (chartH / 4) * i;
             const val = max - (max / 4) * i;
-            ctx.strokeStyle = '#eeeff2'; ctx.lineWidth = 1;
+            ctx.strokeStyle = getThemeColor('--border-light'); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(w - padR, Math.round(y) + 0.5); ctx.stroke();
-            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10.5px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '400 10.5px Inter, sans-serif'; ctx.textAlign = 'right';
             ctx.fillText(fmtShort(val), padL - 10, y + 4);
         }
 
         // X labels (fechas)
         data.forEach((d, i) => {
             const x = padL + (n > 1 ? i * stepX : chartW / 2);
-            ctx.fillStyle = hoverCol === i ? '#1a1d23' : '#9aa0a6';
+            ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
             ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif';
             ctx.textAlign = 'center';
             const dateLabel = d.label || new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
@@ -2032,7 +2111,7 @@ function drawLineChart(canvasId, snapshots) {
         // Vertical hover line
         if (hoverCol >= 0) {
             const hx = padL + (n > 1 ? hoverCol * stepX : chartW / 2);
-            ctx.strokeStyle = 'rgba(26,29,35,.10)'; ctx.lineWidth = 1;
+            ctx.strokeStyle = isDarkMode() ? 'rgba(255,255,255,.10)' : 'rgba(26,29,35,.10)'; ctx.lineWidth = 1;
             ctx.setLineDash([4, 3]);
             ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + chartH); ctx.stroke();
             ctx.setLineDash([]);
@@ -2082,7 +2161,7 @@ function drawLineChart(canvasId, snapshots) {
                 const ey = padT + chartH - (padT + chartH - pt.y) * ease;
                 const isH = hoverCol === i;
                 const r = isH ? 6 : 3.5;
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = getThemeColor('--bg-card');
                 ctx.beginPath(); ctx.arc(pt.x, ey, r + 1.5, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = s.color;
                 ctx.beginPath(); ctx.arc(pt.x, ey, r, 0, Math.PI * 2); ctx.fill();
@@ -2096,7 +2175,7 @@ function drawLineChart(canvasId, snapshots) {
             const lx = legendStartX + i * 110;
             ctx.fillStyle = s.color;
             ctx.beginPath(); ctx.arc(lx + 5, legendY - 3, 4, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#5f6368'; ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
             ctx.fillText(s.label, lx + 14, legendY);
         });
 
@@ -2109,7 +2188,7 @@ function drawLineChart(canvasId, snapshots) {
             const minY = Math.min(...pts.map(p => p[hoverCol].y));
             const ty = Math.max(2, minY - th - 14);
 
-            ctx.fillStyle = '#1a1d23'; ctx.globalAlpha = 0.94;
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.94;
             roundRect(ctx, tx, ty, tw, th, 8); ctx.fill();
             ctx.beginPath();
             ctx.moveTo(hx - 5, ty + th); ctx.lineTo(hx, ty + th + 5); ctx.lineTo(hx + 5, ty + th);
@@ -2228,21 +2307,21 @@ function drawDonutChart(canvasId, bought, paid, balance) {
             const midAngle = s.startAngle + s.sweep / 2;
             const lx = cx + Math.cos(midAngle) * (outerR + 28);
             const ly = cy + Math.sin(midAngle) * (outerR + 28);
-            ctx.fillStyle = isH ? '#1a1d23' : '#5f6368';
+            ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-secondary');
             ctx.font = (isH ? '600' : '500') + ' 12px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(s.label, lx, ly - 6);
-            ctx.fillStyle = isH ? '#1a1d23' : '#9aa0a6';
+            ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-muted');
             ctx.font = '400 11px Inter, sans-serif';
             ctx.fillText(fmtShort(s.val) + ' (' + s.pct + '%)', lx, ly + 10);
         });
 
         // Center text
-        ctx.fillStyle = '#1a1d23';
+        ctx.fillStyle = getThemeColor('--text');
         ctx.font = '700 22px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(fmtShort(total > 0 ? bought : 0), cx, cy - 4);
-        ctx.fillStyle = '#9aa0a6';
+        ctx.fillStyle = getThemeColor('--text-muted');
         ctx.font = '400 12px Inter, sans-serif';
         ctx.fillText('Total Comprado', cx, cy + 16);
 
@@ -2253,12 +2332,12 @@ function drawDonutChart(canvasId, bought, paid, balance) {
             const midA = s.startAngle + s.sweep / 2;
             const ttx = Math.max(4, Math.min(cx + Math.cos(midA) * (innerR + (outerR - innerR) / 2) - tw / 2, w - tw - 4));
             const tty = Math.max(2, cy + Math.sin(midA) * (innerR + (outerR - innerR) / 2) - th - 10);
-            ctx.fillStyle = '#1a1d23'; ctx.globalAlpha = 0.94;
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.94;
             roundRect(ctx, ttx, tty, tw, th, 8); ctx.fill();
             ctx.globalAlpha = 1;
             ctx.fillStyle = '#fff'; ctx.font = '600 12px Inter, sans-serif'; ctx.textAlign = 'center';
             ctx.fillText(s.label + ': ' + fmtFull(s.val), ttx + tw / 2, tty + 17);
-            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10.5px Inter, sans-serif';
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 10.5px Inter, sans-serif';
             ctx.fillText(s.pct + '% del total', ttx + tw / 2, tty + 33);
         }
 
@@ -2364,16 +2443,16 @@ function drawSRChart(data) {
         for (let i = 0; i <= 4; i++) {
             const y = padT + (chartH / 4) * i;
             const val = max - (max / 4) * i;
-            ctx.strokeStyle = '#eeeff2'; ctx.lineWidth = 1;
+            ctx.strokeStyle = getThemeColor('--border-light'); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(w - padR, Math.round(y) + 0.5); ctx.stroke();
-            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '400 10px Inter, sans-serif'; ctx.textAlign = 'right';
             ctx.fillText(fmtShort(val), padL - 8, y + 3);
         }
 
         // Bars
         allBars.forEach((b, i) => {
             const isH = hoverIdx === i;
-            if (isH && b.h > 0) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.12)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3; }
+            if (isH && b.h > 0) { ctx.save(); ctx.shadowColor = isDarkMode() ? 'rgba(0,0,0,.4)' : 'rgba(0,0,0,.12)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3; }
             ctx.fillStyle = isH ? b.hoverColor : b.color;
             const radius = Math.min(4, b.w / 2, b.h > 0 ? b.h : 0);
             if (b.h > 0) {
@@ -2392,7 +2471,7 @@ function drawSRChart(data) {
         // SR labels at bottom
         srArr.forEach((sr, gi) => {
             const groupX = padL + gi * groupW + groupW / 2;
-            ctx.fillStyle = '#5f6368'; ctx.font = '500 10.5px Inter, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 10.5px Inter, sans-serif'; ctx.textAlign = 'center';
             const name = sr.name.length > 14 ? sr.name.slice(0, 13) + '..' : sr.name;
             ctx.fillText(name, groupX, padT + chartH + 20);
         });
@@ -2404,7 +2483,7 @@ function drawSRChart(data) {
             const lx = legendStartX + i * 100;
             ctx.fillStyle = colors[i][0];
             ctx.fillRect(lx, legendY - 8, 10, 10);
-            ctx.fillStyle = '#5f6368'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
             ctx.fillText(l, lx + 14, legendY);
         });
 
@@ -2414,7 +2493,7 @@ function drawSRChart(data) {
             const tw = 180, th = 50;
             const tx = Math.max(4, Math.min(b.x + b.w / 2 - tw / 2, w - tw - 4));
             const ty = Math.max(2, b.y - 64);
-            ctx.fillStyle = '#1a1d23'; ctx.globalAlpha = 0.94;
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.94;
             roundRect(ctx, tx, ty, tw, th, 8); ctx.fill();
             ctx.beginPath();
             ctx.moveTo(b.x + b.w/2 - 5, ty + th);
@@ -2499,6 +2578,28 @@ function toast(msg,type='info'){
     clearTimeout(t._t);
     t._t=setTimeout(()=>t.classList.remove('show'),3000);
 }
+
+// ══════════ DARK MODE ══════════
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const newTheme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.querySelector('meta[name="theme-color"]').content = newTheme === 'dark' ? '#1a1d23' : '#ffffff';
+    // Update charts if they exist
+    if (typeof updateChartsTheme === 'function') updateChartsTheme();
+}
+
+// Apply saved theme on load
+(function() {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.querySelector('meta[name="theme-color"]').content = '#1a1d23';
+    }
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
