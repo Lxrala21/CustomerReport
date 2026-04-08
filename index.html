@@ -1182,6 +1182,38 @@
 </div>
 </div>
 
+<!-- ═══════════ TAB: DIFF ═══════════ -->
+<div class="tab-page" id="page-diff">
+<div class="main">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+            <h2 style="font-size:16px;font-weight:600;color:var(--text);margin:0">Comparar Excel</h2>
+            <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0">Carga un nuevo Excel para comparar contra los datos actuales</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-p" onclick="document.getElementById('diffFileInput').click()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Cargar Excel para comparar
+            </button>
+            <input type="file" id="diffFileInput" accept=".xlsx,.xls,.csv" style="display:none">
+            <button class="btn" id="diffExportBtn" onclick="exportDiff()" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Exportar
+            </button>
+        </div>
+    </div>
+    <div id="diffEmpty" style="text-align:center;padding:80px 24px;color:var(--text-muted)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin-bottom:12px;opacity:.4"><path d="M16 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        <p style="font-size:14px;font-weight:500">Carga un Excel para comparar</p>
+        <p style="font-size:12px;margin-top:4px">Se comparara contra los datos actuales importados</p>
+    </div>
+    <div id="diffResults" style="display:none">
+        <div class="kpi-row" id="diffKpis" style="margin-bottom:20px"></div>
+        <div id="diffSections"></div>
+    </div>
+</div>
+</div>
+
 <!-- ═══════════ EMPTY STATE ═══════════ -->
 <div class="tab-page" id="page-empty">
 <div class="main">
@@ -1215,6 +1247,9 @@
         </button>
         <button class="sheet-tab" data-tab="notassigned" onclick="switchTab('notassigned')">
             Not Assigned <span class="tab-count" id="tcNotassigned">0</span>
+        </button>
+        <button class="sheet-tab" data-tab="diff" onclick="switchTab('diff')">
+            <span class="tab-dot" style="background:#e8a838"></span> Comparar
         </button>
     </div>
 </nav>
@@ -1287,7 +1322,7 @@ function updateChartsTheme() {
 }
 
 // ══════════ TAB SWITCHING ══════════
-const TAB_ORDER = ['dashboard','rawdata','balance','employees','lorena','notassigned'];
+const TAB_ORDER = ['dashboard','rawdata','balance','employees','lorena','notassigned','diff'];
 
 function moveSlider(tabBtn) {
     const slider = document.getElementById('sheetSlider');
@@ -1307,7 +1342,7 @@ function moveSlider(tabBtn) {
 }
 
 function switchTab(tab) {
-    if (!hasData && tab !== 'dashboard') return;
+    if (!hasData && tab !== 'dashboard' && tab !== 'diff') return;
     activeTab = tab;
     document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.sheet-tab').forEach(b => b.classList.remove('active'));
@@ -3106,6 +3141,176 @@ function drawSRBalanceLineChart(srData) {
 
 // Set initial chart toggle state
 setTimeout(() => { const btn = document.getElementById('btnChartLine'); if(btn) btn.classList.add('chart-active'); }, 0);
+
+// ══════════ DIFF / COMPARAR ══════════
+document.getElementById('diffFileInput').addEventListener('change', e => {
+    if (e.target.files.length) processDiffFile(e.target.files[0]);
+    e.target.value = '';
+});
+
+let _diffData = null;
+
+function processDiffFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { toast('Formato no soportado','error'); return; }
+
+    if (!allData.length) { toast('Primero importa un Excel base desde el dashboard','error'); return; }
+
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+            // Parse raw data sheet from the new file
+            let newData = [];
+            wb.SheetNames.forEach(sn => {
+                const key = SHEET_MAP[sn.toLowerCase().trim()];
+                if (key === 'rawdata') newData = parseSheet(wb, sn);
+            });
+            if (!newData.length) {
+                // Fallback: try first sheet
+                newData = parseSheet(wb, wb.SheetNames[0]);
+            }
+            if (!newData.length) { toast('No se encontraron datos en el Excel','error'); return; }
+
+            runDiff(allData, newData, file.name);
+            toast('Comparacion completada','ok');
+        } catch (err) {
+            toast('Error al leer archivo: ' + err.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function runDiff(oldData, newData, fileName) {
+    // Index by customer name (primary key)
+    const oldMap = {};
+    oldData.forEach(r => { const k = (r.customer||'').trim().toLowerCase(); if(k) oldMap[k] = r; });
+    const newMap = {};
+    newData.forEach(r => { const k = (r.customer||'').trim().toLowerCase(); if(k) newMap[k] = r; });
+
+    const added = [];     // In new but not in old
+    const removed = [];   // In old but not in new
+    const changed = [];   // In both but with different amounts
+
+    // Find new & changed
+    Object.keys(newMap).forEach(k => {
+        if (!oldMap[k]) {
+            added.push(newMap[k]);
+        } else {
+            const o = oldMap[k], n = newMap[k];
+            const diffs = [];
+            const fields = [
+                { key:'bought', label:'Comprado' },
+                { key:'paid', label:'Cobrado' },
+                { key:'balance', label:'Balance' },
+            ];
+            fields.forEach(f => {
+                const ov = o[f.key]||0, nv = n[f.key]||0;
+                if (Math.abs(ov - nv) > 0.01) {
+                    diffs.push({ field: f.label, key: f.key, old: ov, new: nv, diff: nv - ov });
+                }
+            });
+            if (diffs.length) {
+                changed.push({ customer: n.customer, company: n.company||o.company, sr1: n.sr1||o.sr1, diffs });
+            }
+        }
+    });
+
+    // Find removed
+    Object.keys(oldMap).forEach(k => {
+        if (!newMap[k]) removed.push(oldMap[k]);
+    });
+
+    _diffData = { added, removed, changed, fileName, date: new Date() };
+    renderDiff();
+}
+
+function renderDiff() {
+    if (!_diffData) return;
+    const { added, removed, changed, fileName } = _diffData;
+    const total = added.length + removed.length + changed.length;
+
+    document.getElementById('diffEmpty').style.display = 'none';
+    document.getElementById('diffResults').style.display = '';
+    document.getElementById('diffExportBtn').style.display = '';
+
+    // KPIs
+    document.getElementById('diffKpis').innerHTML = `
+        <div class="kpi kpi-gn"><div class="kpi-top"><span class="kpi-lb">Nuevos</span></div><div class="kpi-val">${added.length}</div><div class="kpi-sub">Clientes agregados</div></div>
+        <div class="kpi kpi-rd"><div class="kpi-top"><span class="kpi-lb">Eliminados</span></div><div class="kpi-val">${removed.length}</div><div class="kpi-sub">Clientes removidos</div></div>
+        <div class="kpi kpi-am"><div class="kpi-top"><span class="kpi-lb">Modificados</span></div><div class="kpi-val">${changed.length}</div><div class="kpi-sub">Cambios en montos</div></div>
+        <div class="kpi kpi-bl"><div class="kpi-top"><span class="kpi-lb">Total Cambios</span></div><div class="kpi-val">${total}</div><div class="kpi-sub">${fileName}</div></div>
+    `;
+
+    let html = '';
+
+    // Changed
+    if (changed.length) {
+        html += `<div class="card" style="margin-bottom:16px"><div class="card-h"><span class="card-t">Modificados</span><span class="card-s">${changed.length} clientes con cambios en montos</span></div>
+        <div class="table-scroll"><table class="dt" style="min-width:700px"><thead><tr><th>Cliente</th><th>Empresa</th><th>SR1</th><th>Campo</th><th class="num">Anterior</th><th class="num">Nuevo</th><th class="num">Diferencia</th></tr></thead><tbody>`;
+        changed.forEach(c => {
+            c.diffs.forEach((d, di) => {
+                const cls = d.diff > 0 ? 'tg-red' : 'tg-green';
+                const sign = d.diff > 0 ? '+' : '';
+                html += `<tr>`;
+                if (di === 0) html += `<td class="cname" rowspan="${c.diffs.length}">${esc(c.customer)}</td><td rowspan="${c.diffs.length}">${esc(c.company||'--')}</td><td rowspan="${c.diffs.length}">${esc(cleanSR(c.sr1))}</td>`;
+                html += `<td>${d.field}</td><td class="num">${fmtMoney(d.old)}</td><td class="num">${fmtMoney(d.new)}</td><td class="num ${cls}" style="font-weight:700">${sign}${fmtMoney(d.diff)}</td></tr>`;
+            });
+        });
+        html += `</tbody></table></div></div>`;
+    }
+
+    // Added
+    if (added.length) {
+        html += `<div class="card" style="margin-bottom:16px"><div class="card-h"><span class="card-t" style="color:#5a7d65">+ Nuevos</span><span class="card-s">${added.length} clientes</span></div>
+        <div class="table-scroll"><table class="dt" style="min-width:600px"><thead><tr><th>Cliente</th><th>Empresa</th><th class="num">Comprado</th><th class="num">Cobrado</th><th class="num">Balance</th><th>SR1</th></tr></thead><tbody>`;
+        added.forEach(r => {
+            html += `<tr><td class="cname">${esc(r.customer)}</td><td>${esc(r.company||'--')}</td><td class="num tg-amber">${fmtMoney(r.bought||0)}</td><td class="num tg-green">${fmtMoney(r.paid||0)}</td><td class="num tg-red">${fmtMoney(r.balance||0)}</td><td>${esc(cleanSR(r.sr1))}</td></tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+    }
+
+    // Removed
+    if (removed.length) {
+        html += `<div class="card" style="margin-bottom:16px"><div class="card-h"><span class="card-t" style="color:#b85c5c">- Eliminados</span><span class="card-s">${removed.length} clientes</span></div>
+        <div class="table-scroll"><table class="dt" style="min-width:600px"><thead><tr><th>Cliente</th><th>Empresa</th><th class="num">Comprado</th><th class="num">Cobrado</th><th class="num">Balance</th><th>SR1</th></tr></thead><tbody>`;
+        removed.forEach(r => {
+            html += `<tr style="opacity:.6"><td class="cname">${esc(r.customer)}</td><td>${esc(r.company||'--')}</td><td class="num">${fmtMoney(r.bought||0)}</td><td class="num">${fmtMoney(r.paid||0)}</td><td class="num">${fmtMoney(r.balance||0)}</td><td>${esc(cleanSR(r.sr1))}</td></tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+    }
+
+    if (!total) {
+        html = `<div class="card" style="padding:60px 24px;text-align:center"><p style="font-size:14px;color:var(--text-muted)">No se encontraron diferencias entre los archivos</p></div>`;
+    }
+
+    document.getElementById('diffSections').innerHTML = html;
+}
+
+function exportDiff() {
+    if (!_diffData) return;
+    const { added, removed, changed } = _diffData;
+    const rows = [];
+
+    changed.forEach(c => {
+        c.diffs.forEach(d => {
+            rows.push({ Tipo:'Modificado', Cliente:c.customer, Empresa:c.company, SR1:cleanSR(c.sr1), Campo:d.field, Anterior:d.old, Nuevo:d.new, Diferencia:d.diff });
+        });
+    });
+    added.forEach(r => {
+        rows.push({ Tipo:'Nuevo', Cliente:r.customer, Empresa:r.company||'', SR1:cleanSR(r.sr1), Campo:'', Anterior:'', Nuevo:'', Diferencia:'', Comprado:r.bought||0, Cobrado:r.paid||0, Balance:r.balance||0 });
+    });
+    removed.forEach(r => {
+        rows.push({ Tipo:'Eliminado', Cliente:r.customer, Empresa:r.company||'', SR1:cleanSR(r.sr1), Campo:'', Anterior:'', Nuevo:'', Diferencia:'', Comprado:r.bought||0, Cobrado:r.paid||0, Balance:r.balance||0 });
+    });
+
+    if (!rows.length) { toast('No hay diferencias para exportar','error'); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Diferencias');
+    XLSX.writeFile(wb, 'Comparacion_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    toast('Excel exportado','ok');
+}
 
 // ══════════ EXPORT ══════════
 function exportTab(tab) {
