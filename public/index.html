@@ -3269,25 +3269,34 @@ function runDiff(oldData, newData, fileName) {
         if (!newMap[k]) removed.push(oldMap[k]);
     });
 
-    _diffData = { added, removed, changed, fileName, date: new Date() };
+    // Totals
+    const oldTotals = { bought: oldData.reduce((s,r)=>s+(r.bought||0),0), paid: oldData.reduce((s,r)=>s+(r.paid||0),0), balance: oldData.reduce((s,r)=>s+(r.balance||0),0) };
+    const newTotals = { bought: newData.reduce((s,r)=>s+(r.bought||0),0), paid: newData.reduce((s,r)=>s+(r.paid||0),0), balance: newData.reduce((s,r)=>s+(r.balance||0),0) };
+
+    _diffData = { added, removed, changed, fileName, date: new Date(), oldTotals, newTotals };
     renderDiff();
 }
 
 function renderDiff() {
     if (!_diffData) return;
-    const { added, removed, changed, fileName } = _diffData;
+    const { added, removed, changed, fileName, oldTotals, newTotals } = _diffData;
     const total = added.length + removed.length + changed.length;
 
     document.getElementById('diffEmpty').style.display = 'none';
     document.getElementById('diffResults').style.display = '';
     document.getElementById('diffExportBtn').style.display = '';
 
+    const diffBought = newTotals.bought - oldTotals.bought;
+    const diffPaid = newTotals.paid - oldTotals.paid;
+    const diffBalance = newTotals.balance - oldTotals.balance;
+    const fmtDiff = (v) => (v >= 0 ? '+' : '') + fmtShort(v);
+
     // KPIs
     document.getElementById('diffKpis').innerHTML = `
-        <div class="kpi kpi-gn"><div class="kpi-top"><span class="kpi-lb">Nuevos</span></div><div class="kpi-val">${added.length}</div><div class="kpi-sub">Clientes agregados</div></div>
-        <div class="kpi kpi-rd"><div class="kpi-top"><span class="kpi-lb">Eliminados</span></div><div class="kpi-val">${removed.length}</div><div class="kpi-sub">Clientes removidos</div></div>
-        <div class="kpi kpi-am"><div class="kpi-top"><span class="kpi-lb">Modificados</span></div><div class="kpi-val">${changed.length}</div><div class="kpi-sub">Cambios en montos</div></div>
-        <div class="kpi kpi-bl"><div class="kpi-top"><span class="kpi-lb">Total Cambios</span></div><div class="kpi-val">${total}</div><div class="kpi-sub">${fileName}</div></div>
+        <div class="kpi kpi-am"><div class="kpi-top"><span class="kpi-lb">Comprado</span></div><div class="kpi-val">${fmtShort(newTotals.bought)}</div><div class="kpi-sub" style="color:${diffBought>=0?'var(--positive)':'var(--negative)'}">${fmtDiff(diffBought)} vs anterior</div></div>
+        <div class="kpi kpi-gn"><div class="kpi-top"><span class="kpi-lb">Cobrado</span></div><div class="kpi-val">${fmtShort(newTotals.paid)}</div><div class="kpi-sub" style="color:${diffPaid>=0?'var(--positive)':'var(--negative)'}">${fmtDiff(diffPaid)} vs anterior</div></div>
+        <div class="kpi kpi-rd"><div class="kpi-top"><span class="kpi-lb">Pendiente</span></div><div class="kpi-val">${fmtShort(newTotals.balance)}</div><div class="kpi-sub" style="color:${diffBalance<=0?'var(--positive)':'var(--negative)'}">${fmtDiff(diffBalance)} vs anterior</div></div>
+        <div class="kpi kpi-bl"><div class="kpi-top"><span class="kpi-lb">Cambios</span></div><div class="kpi-val">${total}</div><div class="kpi-sub"><span style="color:var(--positive)">${added.length} nuevos</span> · <span style="color:var(--negative)">${removed.length} elim.</span> · ${changed.length} mod.</div></div>
     `;
 
     let html = '';
