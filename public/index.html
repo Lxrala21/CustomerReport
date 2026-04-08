@@ -473,6 +473,21 @@
             max-width: 180px; overflow: hidden; text-overflow: ellipsis;
         }
         .dt .num { text-align: right; white-space: nowrap; }
+        .dt tr.tab-total td {
+            background: linear-gradient(90deg, rgba(184,122,106,.08), rgba(184,122,106,.03));
+            border-top: 2px solid #b87a6a;
+            border-bottom: 2px solid #b87a6a;
+            font-weight: 700;
+            font-size: 13.5px;
+            color: var(--text);
+            padding: 12px 14px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        [data-theme="dark"] .dt tr.tab-total td {
+            background: linear-gradient(90deg, rgba(184,122,106,.12), rgba(184,122,106,.04));
+        }
         .tg-green { color: var(--positive); font-weight: 600; }
         .tg-red { color: var(--negative); font-weight: 600; }
         .tg-amber { color: var(--warning); font-weight: 600; }
@@ -1744,7 +1759,7 @@ function renderTabTable(tab) {
     if (moneyKeys.length > 0) {
         const totals = {};
         moneyKeys.forEach(k => { totals[k] = d.reduce((s, r) => s + (r[k] || 0), 0); });
-        const totRow = '<tr class="total">' + visCols.map(c => {
+        const totRow = '<tr class="tab-total">' + visCols.map(c => {
             if (moneyKeys.includes(c.key)) {
                 let cls = 'num';
                 if(c.key.startsWith('balance')) cls += ' tg-red';
