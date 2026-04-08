@@ -3375,7 +3375,7 @@ function renderDiff() {
         html += `<div class="card" style="margin-bottom:16px"><div class="card-h"><span class="card-t" style="color:#5a7d65">+ Nuevos</span><span class="card-s">${added.length} clientes</span></div>
         <div class="table-scroll"><table class="dt" style="min-width:600px"><thead><tr><th>Cliente</th><th>Empresa</th><th class="num">Comprado</th><th class="num">Cobrado</th><th class="num">Balance</th><th>SR1</th></tr></thead><tbody>`;
         added.forEach(r => {
-            html += `<tr><td class="cname">${esc(r.customer)}</td><td>${esc(r.company||'--')}</td><td class="num tg-amber">${fmtMoney(r.bought||0)}</td><td class="num tg-green">${fmtMoney(r.paid||0)}</td><td class="num tg-red">${fmtMoney(r.balance||0)}</td><td>${esc(cleanSR(r.sr1))}</td></tr>`;
+            html += `<tr style="background:rgba(90,125,101,.08);border-left:3px solid #5a7d65"><td class="cname" style="color:#5a7d65;font-weight:600">${esc(r.customer)}</td><td>${esc(r.company||'--')}</td><td class="num tg-amber">${fmtMoney(r.bought||0)}</td><td class="num tg-green">${fmtMoney(r.paid||0)}</td><td class="num tg-red">${fmtMoney(r.balance||0)}</td><td>${esc(cleanSR(r.sr1))}</td></tr>`;
         });
         html += `</tbody></table></div></div>`;
     }
