@@ -956,15 +956,7 @@
         </div>
         <div class="card">
             <div class="card-h">
-                <div><span class="card-t">Por Representante</span><div class="card-s">Comprado vs Cobrado vs Pendiente por SR1</div></div>
-            </div>
-            <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
-                <canvas id="srChart"></canvas>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-h">
-                <div><span class="card-t">Comprado vs Balance por Representante</span><div class="card-s">Comparativa entre SR1s</div></div>
+                <div><span class="card-t">Comprado vs Cobrado vs Balance por Representante</span><div class="card-s">Comparativa entre SR1s</div></div>
             </div>
             <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
                 <canvas id="srBalanceLineChart"></canvas>
@@ -1274,7 +1266,6 @@ function isDarkMode() {
 function updateChartsTheme() {
     if (hasData && activeTab === 'dashboard') {
         drawMainChart();
-        drawSRChart(allData || []);
         drawSRBalanceLineChart(window._srArr || []);
         drawHorizontalBarChart('dashHBarChart', allData || []);
     }
@@ -2196,7 +2187,6 @@ function renderDashboard() {
     } else {
         drawMainChart();
     }
-    drawSRChart(d);
 
     // Recencia
     const buckets=[{l:'0 - 7 dias',mn:0,mx:7},{l:'8 - 30 dias',mn:8,mx:30},{l:'31 - 90 dias',mn:31,mx:90},{l:'91 - 180 dias',mn:91,mx:180},{l:'181 - 365 dias',mn:181,mx:365},{l:'365+ dias',mn:366,mx:99999}];
@@ -2814,10 +2804,11 @@ function drawSRBalanceLineChart(srData) {
     }
 
     const series = [
-        { key: 'bought', label: 'Comprado', color: '#8b8fa3', colorAlt: '#a0a4b8', fill: 'rgba(139,143,163,' },
-        { key: 'balance', label: 'Balance', color: '#b87a6a', colorAlt: '#d4988a', fill: 'rgba(184,122,106,' },
+        { key: 'bought', label: 'Comprado', color: '#8b8fa3', colorAlt: '#a0a4b8', fill: 'rgba(139,143,163,', rgb: '139,143,163' },
+        { key: 'paid', label: 'Cobrado', color: '#5a7d65', colorAlt: '#74a382', fill: 'rgba(90,125,101,', rgb: '90,125,101' },
+        { key: 'balance', label: 'Balance', color: '#b87a6a', colorAlt: '#d4988a', fill: 'rgba(184,122,106,', rgb: '184,122,106' },
     ];
-    const max = Math.max(...srData.flatMap(s => [s.balance, s.bought]), 1);
+    const max = Math.max(...srData.flatMap(s => [s.balance, s.bought, s.paid]), 1);
     const n = srData.length;
     const padL = 80, padR = 30, padT = 40, padB = 55;
     const chartW = w - padL - padR;
@@ -2910,7 +2901,7 @@ function drawSRBalanceLineChart(srData) {
 
             // Glow line
             ctx.save();
-            const rgb = si === 0 ? '139,143,163' : '184,122,106';
+            const rgb = s.rgb;
             ctx.strokeStyle = `rgba(${rgb},${0.12 + pulse * 0.08})`;
             ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
             ctx.filter = 'blur(4px)';
@@ -2977,7 +2968,7 @@ function drawSRBalanceLineChart(srData) {
         });
 
         // Floating value labels (balance only)
-        allPts[1].forEach((pt, i) => {
+        allPts[2].forEach((pt, i) => {
             const ey = padT + chartH - (padT + chartH - pt.y) * ease;
             const isH = hoverCol === i;
             const targetOp = (ease >= 1 && (isH || hoverCol < 0)) ? 1 : (hoverCol >= 0 && !isH ? 0.3 : 0);
@@ -2990,9 +2981,9 @@ function drawSRBalanceLineChart(srData) {
             }
         });
 
-        // Legend (2 series)
+        // Legend (3 series)
         const legendY = h - 8;
-        const legendStartX = w / 2 - 90;
+        const legendStartX = w / 2 - 150;
         series.forEach((s, i) => {
             const lx = legendStartX + i * 110;
             ctx.fillStyle = s.color;
@@ -3003,10 +2994,10 @@ function drawSRBalanceLineChart(srData) {
 
         // Tooltip
         if (hoverCol >= 0 && ease >= 1) {
-            const pt = allPts[1][hoverCol];
-            const tw = 220, th = 94;
+            const pt = allPts[2][hoverCol];
+            const tw = 220, th = 108;
             const tx = Math.max(4, Math.min(pt.x - tw / 2, w - tw - 4));
-            const minY = Math.min(allPts[0][hoverCol].y, allPts[1][hoverCol].y);
+            const minY = Math.min(...allPts.map(p => p[hoverCol].y));
             const ey = padT + chartH - (padT + chartH - minY);
             const ty = Math.max(2, ey - th - 28);
             ctx.save();
@@ -3029,16 +3020,20 @@ function drawSRBalanceLineChart(srData) {
             ctx.fillText('Comprado:', tx + 28, ty + 50);
             ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
             ctx.fillText(fmtFull(pt.bought), tx + tw - 14, ty + 50);
-            // Balance
+            // Cobrado
             ctx.fillStyle = series[1].color;
             ctx.beginPath(); ctx.arc(tx + 18, ty + 66 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
-            ctx.fillText('Balance:', tx + 28, ty + 66);
+            ctx.fillText('Cobrado:', tx + 28, ty + 66);
             ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
-            ctx.fillText(fmtFull(pt.balance), tx + tw - 14, ty + 66);
-            // Cobrado
-            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif'; ctx.textAlign = 'left';
-            ctx.fillText('Cobrado: ' + fmtShort(pt.paid), tx + 14, ty + 83);
+            ctx.fillText(fmtFull(pt.paid), tx + tw - 14, ty + 66);
+            // Balance
+            ctx.fillStyle = series[2].color;
+            ctx.beginPath(); ctx.arc(tx + 18, ty + 82 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Balance:', tx + 28, ty + 82);
+            ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtFull(pt.balance), tx + tw - 14, ty + 82);
         }
         ctx.restore();
     }
