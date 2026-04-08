@@ -994,7 +994,7 @@
             <div class="table-scroll"><table class="mt"><thead><tr><th>Representante</th><th class="n">Clientes</th><th class="n">Balance USD</th><th class="n">Comprado</th><th class="n">Cobrado</th><th class="n">% Cobro</th></tr></thead><tbody id="tbSR"></tbody></table></div>
         </div>
         <div class="card">
-            <div class="card-h"><span class="card-t">Top 5 Clientes</span><span class="card-s">Mayor balance pendiente</span></div>
+            <div class="card-h" style="display:flex;justify-content:space-between;align-items:center"><div><span class="card-t">Top 5 Clientes</span><span class="card-s">Mayor balance pendiente</span></div><div style="text-align:right"><div style="font-size:10px;color:var(--text-muted);font-weight:500">Balance Total</div><div id="top5Total" style="font-size:16px;font-weight:700;color:#b87a6a;font-variant-numeric:tabular-nums">$0</div></div></div>
             <div id="top5Container"></div>
         </div>
     </div>
@@ -2253,8 +2253,10 @@ function renderDashboard() {
     // Top 5
     const top5=[...d].sort((a,b)=>(b.balance||0)-(a.balance||0)).slice(0,5);
     const rc=['t5-r1','t5-r2','t5-r3','t5-r4','t5-r5'];
+    document.getElementById('top5Total').textContent=fmtMoney(totalBalance);
     document.getElementById('top5Container').innerHTML=top5.map((r,i)=>{
-        return `<div class="t5-row"><div class="t5-rank ${rc[i]}">${i+1}</div><div><div class="t5-name">${esc(r.customer)}</div><div class="t5-company">${esc(r.company||'--')}</div></div><div class="t5-val">${fmtMoney(r.balance||0)}</div></div>`;
+        const p=r.bought>0?((r.paid/r.bought)*100).toFixed(1):'0';
+        return `<div class="t5-row"><div class="t5-rank ${rc[i]}">${i+1}</div><div><div class="t5-name">${esc(r.customer)}</div><div class="t5-company">${esc(r.company||'--')}</div></div><div class="t5-val">${fmtMoney(r.balance||0)}</div><div class="t5-pct">${p}% cobrado</div></div>`;
     }).join('');
 }
 
