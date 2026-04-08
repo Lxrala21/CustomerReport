@@ -3276,7 +3276,7 @@ function runDiff(oldData, newData, fileName) {
                 }
             });
             if (diffs.length) {
-                changed.push({ customer: n.customer, company: n.company||o.company, sr1: n.sr1||o.sr1, diffs });
+                changed.push({ customer: n.customer, company: n.company||o.company, sr1: n.sr1||o.sr1, diffs, old: o, new: n });
             }
         }
     });
@@ -3353,15 +3353,19 @@ function renderDiff() {
     // Changed
     if (changed.length) {
         html += `<div class="card" style="margin-bottom:16px"><div class="card-h"><span class="card-t">Modificados</span><span class="card-s">${changed.length} clientes con cambios en montos</span></div>
-        <div class="table-scroll"><table class="dt" style="min-width:700px"><thead><tr><th>Cliente</th><th>Empresa</th><th>SR1</th><th>Campo</th><th class="num">Anterior</th><th class="num">Nuevo</th><th class="num">Diferencia</th></tr></thead><tbody>`;
+        <div class="table-scroll"><table class="dt" style="min-width:1100px"><thead><tr><th>Cliente</th><th>Empresa</th><th>SR1</th><th class="num">Comprado Ant.</th><th class="num">Comprado Nuevo</th><th class="num">Cobrado Ant.</th><th class="num">Cobrado Nuevo</th><th class="num">Balance Ant.</th><th class="num">Balance Nuevo</th><th class="num">Dif. Balance</th></tr></thead><tbody>`;
         changed.forEach(c => {
-            c.diffs.forEach((d, di) => {
-                const cls = d.diff > 0 ? 'tg-red' : 'tg-green';
-                const sign = d.diff > 0 ? '+' : '';
-                html += `<tr>`;
-                if (di === 0) html += `<td class="cname" rowspan="${c.diffs.length}">${esc(c.customer)}</td><td rowspan="${c.diffs.length}">${esc(c.company||'--')}</td><td rowspan="${c.diffs.length}">${esc(cleanSR(c.sr1))}</td>`;
-                html += `<td>${d.field}</td><td class="num">${fmtMoney(d.old)}</td><td class="num">${fmtMoney(d.new)}</td><td class="num ${cls}" style="font-weight:700">${sign}${fmtMoney(d.diff)}</td></tr>`;
-            });
+            const ob = c.old.bought||0, nb = c.new.bought||0;
+            const op = c.old.paid||0, np = c.new.paid||0;
+            const obl = c.old.balance||0, nbl = c.new.balance||0;
+            const diffBal = nbl - obl;
+            const cls = diffBal > 0 ? 'tg-red' : diffBal < 0 ? 'tg-green' : '';
+            const sign = diffBal > 0 ? '+' : '';
+            html += `<tr><td class="cname">${esc(c.customer)}</td><td>${esc(c.company||'--')}</td><td>${esc(cleanSR(c.sr1))}</td>`;
+            html += `<td class="num">${fmtMoney(ob)}</td><td class="num${ob!==nb?' tg-amber':''}">${fmtMoney(nb)}</td>`;
+            html += `<td class="num">${fmtMoney(op)}</td><td class="num${op!==np?' tg-green':''}">${fmtMoney(np)}</td>`;
+            html += `<td class="num">${fmtMoney(obl)}</td><td class="num${obl!==nbl?' tg-red':''}">${fmtMoney(nbl)}</td>`;
+            html += `<td class="num ${cls}" style="font-weight:700">${sign}${fmtMoney(diffBal)}</td></tr>`;
         });
         html += `</tbody></table></div></div>`;
     }
@@ -3430,7 +3434,7 @@ function applyDiffFilters() {
                 const ov = o[f.key]||0, nv = n[f.key]||0;
                 if (Math.abs(ov-nv)>0.01) diffs.push({field:f.label,key:f.key,old:ov,new:nv,diff:nv-ov});
             });
-            if (diffs.length) changed.push({customer:n.customer,company:n.company||o.company,sr1:n.sr1||o.sr1,diffs});
+            if (diffs.length) changed.push({customer:n.customer,company:n.company||o.company,sr1:n.sr1||o.sr1,diffs,old:o,new:n});
         }
     });
     Object.keys(oldMap).forEach(k => { if (!newMap[k]) removed.push(oldMap[k]); });
