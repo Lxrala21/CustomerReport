@@ -964,7 +964,7 @@
         </div>
         <div class="card">
             <div class="card-h">
-                <div><span class="card-t">Balance USD por Representante</span><div class="card-s">Comparativa de balance entre SR1s</div></div>
+                <div><span class="card-t">Comprado vs Balance por Representante</span><div class="card-s">Comparativa entre SR1s</div></div>
             </div>
             <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
                 <canvas id="srBalanceLineChart"></canvas>
@@ -2812,25 +2812,27 @@ function drawSRBalanceLineChart(srData) {
         return;
     }
 
-    const lineColor = '#b87a6a';
-    const lineColorAlt = '#d4988a';
-    const max = Math.max(...srData.map(s => s.balance), 1);
+    const series = [
+        { key: 'bought', label: 'Comprado', color: '#8b8fa3', colorAlt: '#a0a4b8', fill: 'rgba(139,143,163,' },
+        { key: 'balance', label: 'Balance', color: '#b87a6a', colorAlt: '#d4988a', fill: 'rgba(184,122,106,' },
+    ];
+    const max = Math.max(...srData.flatMap(s => [s.balance, s.bought]), 1);
     const n = srData.length;
     const padL = 80, padR = 30, padT = 40, padB = 55;
     const chartW = w - padL - padR;
     const chartH = h - padT - padB;
     const stepX = n > 1 ? chartW / (n - 1) : chartW;
 
-    const pts = srData.map((s, i) => ({
+    const allPts = series.map(s => srData.map((sr, i) => ({
         x: padL + (n > 1 ? i * stepX : chartW / 2),
-        y: padT + chartH - (max > 0 ? (s.balance / max) * chartH : 0),
-        val: s.balance, name: s.name, clients: s.clients, pct: s.pct, bought: s.bought, paid: s.paid
-    }));
+        y: padT + chartH - (max > 0 ? (sr[s.key] / max) * chartH : 0),
+        val: sr[s.key], name: sr.name, clients: sr.clients, pct: sr.pct, bought: sr.bought, paid: sr.paid, balance: sr.balance
+    })));
 
     let hoverCol = -1;
     let animTime = 0;
-    let dotScales = pts.map(() => 1);
-    let labelOpacities = pts.map(() => 0);
+    let dotScales = allPts.map(pts => pts.map(() => 1));
+    let labelOpacities = allPts[1].map(() => 0);
     let running = true;
 
     // Stop previous animation loop
@@ -2869,7 +2871,7 @@ function drawSRBalanceLineChart(srData) {
 
         // Hover column highlight band
         if (hoverCol >= 0) {
-            const hx = pts[hoverCol].x;
+            const hx = allPts[0][hoverCol].x;
             const bandW = stepX * 0.6;
             ctx.fillStyle = isDarkMode() ? 'rgba(184,122,106,.06)' : 'rgba(184,122,106,.04)';
             ctx.fillRect(hx - bandW / 2, padT, bandW, chartH);
@@ -2879,99 +2881,102 @@ function drawSRBalanceLineChart(srData) {
             ctx.setLineDash([]);
         }
 
-        // Animated gradient area fill
-        const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-        const glowAlpha = 0.08 + pulse * 0.04;
-        grad.addColorStop(0, `rgba(184,122,106,${glowAlpha + 0.06})`);
-        grad.addColorStop(0.6, `rgba(184,122,106,${glowAlpha})`);
-        grad.addColorStop(1, 'rgba(184,122,106,0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, padT + chartH);
-        pts.forEach((pt, i) => {
-            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
-            if (i === 0) ctx.lineTo(pt.x, ey);
-            else {
-                const prev = pts[i - 1];
-                const cpx = (prev.x + pt.x) / 2;
-                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
-                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
-            }
+        // Draw each series (area, glow, line, dots)
+        series.forEach((s, si) => {
+            const pts = allPts[si];
+
+            // Animated gradient area fill
+            const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+            const glowAlpha = 0.06 + pulse * 0.03;
+            grad.addColorStop(0, s.fill + (glowAlpha + 0.04) + ')');
+            grad.addColorStop(0.6, s.fill + glowAlpha + ')');
+            grad.addColorStop(1, s.fill + '0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, padT + chartH);
+            pts.forEach((pt, i) => {
+                const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+                if (i === 0) ctx.lineTo(pt.x, ey);
+                else {
+                    const prev = pts[i - 1];
+                    const cpx = (prev.x + pt.x) / 2;
+                    const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                    ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+                }
+            });
+            ctx.lineTo(pts[pts.length - 1].x, padT + chartH);
+            ctx.closePath(); ctx.fill();
+
+            // Glow line
+            ctx.save();
+            const rgb = si === 0 ? '139,143,163' : '184,122,106';
+            ctx.strokeStyle = `rgba(${rgb},${0.12 + pulse * 0.08})`;
+            ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            ctx.filter = 'blur(4px)';
+            ctx.beginPath();
+            pts.forEach((pt, i) => {
+                const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+                if (i === 0) ctx.moveTo(pt.x, ey);
+                else {
+                    const prev = pts[i - 1];
+                    const cpx = (prev.x + pt.x) / 2;
+                    const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                    ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+                }
+            });
+            ctx.stroke();
+            ctx.restore();
+
+            // Main line
+            const lineGrad = ctx.createLinearGradient(pts[0].x, 0, pts[pts.length - 1].x, 0);
+            lineGrad.addColorStop(0, s.colorAlt);
+            lineGrad.addColorStop(0.5, s.color);
+            lineGrad.addColorStop(1, s.colorAlt);
+            ctx.strokeStyle = lineGrad; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            ctx.beginPath();
+            pts.forEach((pt, i) => {
+                const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+                if (i === 0) ctx.moveTo(pt.x, ey);
+                else {
+                    const prev = pts[i - 1];
+                    const cpx = (prev.x + pt.x) / 2;
+                    const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                    ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+                }
+            });
+            ctx.stroke();
+
+            // Dots with pulse
+            pts.forEach((pt, i) => {
+                const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+                const isH = hoverCol === i;
+                const targetScale = isH ? 1.4 : 1;
+                dotScales[si][i] += (targetScale - dotScales[si][i]) * 0.15;
+                const sc = dotScales[si][i];
+                const r = 3.5 * sc;
+
+                if (isH) {
+                    const ringR = 10 + pulse * 3;
+                    ctx.beginPath(); ctx.arc(pt.x, ey, ringR, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${rgb},${0.06 + pulse * 0.04})`; ctx.fill();
+                }
+                if (!isH && ease >= 1) {
+                    const idlePulse = Math.sin(time * 0.002 + i * 0.8 + si * 2) * 0.5 + 0.5;
+                    ctx.beginPath(); ctx.arc(pt.x, ey, 5 + idlePulse * 1.5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${rgb},${0.02 + idlePulse * 0.02})`; ctx.fill();
+                }
+
+                ctx.fillStyle = getThemeColor('--bg-card');
+                ctx.beginPath(); ctx.arc(pt.x, ey, r + 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = s.color;
+                ctx.beginPath(); ctx.arc(pt.x, ey, r, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = s.colorAlt;
+                ctx.beginPath(); ctx.arc(pt.x, ey, r * 0.35, 0, Math.PI * 2); ctx.fill();
+            });
         });
-        ctx.lineTo(pts[pts.length - 1].x, padT + chartH);
-        ctx.closePath(); ctx.fill();
 
-        // Glow line (wider, blurred behind main line)
-        ctx.save();
-        ctx.strokeStyle = `rgba(184,122,106,${0.15 + pulse * 0.1})`;
-        ctx.lineWidth = 8; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        ctx.filter = 'blur(4px)';
-        ctx.beginPath();
-        pts.forEach((pt, i) => {
-            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
-            if (i === 0) ctx.moveTo(pt.x, ey);
-            else {
-                const prev = pts[i - 1];
-                const cpx = (prev.x + pt.x) / 2;
-                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
-                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
-            }
-        });
-        ctx.stroke();
-        ctx.restore();
-
-        // Main line with gradient stroke
-        const lineGrad = ctx.createLinearGradient(pts[0].x, 0, pts[pts.length - 1].x, 0);
-        lineGrad.addColorStop(0, lineColorAlt);
-        lineGrad.addColorStop(0.5, lineColor);
-        lineGrad.addColorStop(1, lineColorAlt);
-        ctx.strokeStyle = lineGrad; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        ctx.beginPath();
-        pts.forEach((pt, i) => {
-            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
-            if (i === 0) ctx.moveTo(pt.x, ey);
-            else {
-                const prev = pts[i - 1];
-                const cpx = (prev.x + pt.x) / 2;
-                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
-                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
-            }
-        });
-        ctx.stroke();
-
-        // Dots with pulse ring + scale animation
-        pts.forEach((pt, i) => {
-            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
-            const isH = hoverCol === i;
-            const targetScale = isH ? 1.5 : 1;
-            dotScales[i] += (targetScale - dotScales[i]) * 0.15;
-            const sc = dotScales[i];
-            const r = 4 * sc;
-
-            // Outer pulse ring on hover
-            if (isH) {
-                const ringR = 12 + pulse * 4;
-                ctx.beginPath(); ctx.arc(pt.x, ey, ringR, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(184,122,106,${0.08 + pulse * 0.06})`; ctx.fill();
-            }
-            // Subtle idle pulse ring
-            if (!isH && ease >= 1) {
-                const idlePulse = Math.sin(time * 0.002 + i * 0.8) * 0.5 + 0.5;
-                ctx.beginPath(); ctx.arc(pt.x, ey, 6 + idlePulse * 2, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(184,122,106,${0.03 + idlePulse * 0.03})`; ctx.fill();
-            }
-
-            ctx.fillStyle = getThemeColor('--bg-card');
-            ctx.beginPath(); ctx.arc(pt.x, ey, r + 2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = lineColor;
-            ctx.beginPath(); ctx.arc(pt.x, ey, r, 0, Math.PI * 2); ctx.fill();
-            // Inner bright dot
-            ctx.fillStyle = lineColorAlt;
-            ctx.beginPath(); ctx.arc(pt.x, ey, r * 0.4, 0, Math.PI * 2); ctx.fill();
-        });
-
-        // Floating value labels above dots
-        pts.forEach((pt, i) => {
+        // Floating value labels (balance only)
+        allPts[1].forEach((pt, i) => {
             const ey = padT + chartH - (padT + chartH - pt.y) * ease;
             const isH = hoverCol === i;
             const targetOp = (ease >= 1 && (isH || hoverCol < 0)) ? 1 : (hoverCol >= 0 && !isH ? 0.3 : 0);
@@ -2984,19 +2989,24 @@ function drawSRBalanceLineChart(srData) {
             }
         });
 
-        // Legend
+        // Legend (2 series)
         const legendY = h - 8;
-        ctx.fillStyle = lineColor;
-        ctx.beginPath(); ctx.arc(w / 2 - 40, legendY - 3, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
-        ctx.fillText('Balance USD', w / 2 - 30, legendY);
+        const legendStartX = w / 2 - 90;
+        series.forEach((s, i) => {
+            const lx = legendStartX + i * 110;
+            ctx.fillStyle = s.color;
+            ctx.beginPath(); ctx.arc(lx + 5, legendY - 3, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(s.label, lx + 14, legendY);
+        });
 
         // Tooltip
         if (hoverCol >= 0 && ease >= 1) {
-            const pt = pts[hoverCol];
-            const tw = 220, th = 80;
+            const pt = allPts[1][hoverCol];
+            const tw = 220, th = 94;
             const tx = Math.max(4, Math.min(pt.x - tw / 2, w - tw - 4));
-            const ey = padT + chartH - (padT + chartH - pt.y);
+            const minY = Math.min(allPts[0][hoverCol].y, allPts[1][hoverCol].y);
+            const ey = padT + chartH - (padT + chartH - minY);
             const ty = Math.max(2, ey - th - 28);
             ctx.save();
             ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
@@ -3011,14 +3021,23 @@ function drawSRBalanceLineChart(srData) {
             ctx.fillText(pt.name, tx + 14, ty + 18);
             ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif';
             ctx.fillText(pt.clients + ' clientes · ' + pt.pct.toFixed(1) + '% cobro', tx + 14, ty + 32);
-            ctx.fillStyle = lineColor;
+            // Comprado
+            ctx.fillStyle = series[0].color;
             ctx.beginPath(); ctx.arc(tx + 18, ty + 50 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
-            ctx.fillText('Balance:', tx + 28, ty + 50);
+            ctx.fillText('Comprado:', tx + 28, ty + 50);
             ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
-            ctx.fillText(fmtFull(pt.val), tx + tw - 14, ty + 50);
+            ctx.fillText(fmtFull(pt.bought), tx + tw - 14, ty + 50);
+            // Balance
+            ctx.fillStyle = series[1].color;
+            ctx.beginPath(); ctx.arc(tx + 18, ty + 66 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Balance:', tx + 28, ty + 66);
+            ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtFull(pt.balance), tx + tw - 14, ty + 66);
+            // Cobrado
             ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif'; ctx.textAlign = 'left';
-            ctx.fillText('Comprado: ' + fmtShort(pt.bought) + '  Cobrado: ' + fmtShort(pt.paid), tx + 14, ty + 67);
+            ctx.fillText('Cobrado: ' + fmtShort(pt.paid), tx + 14, ty + 83);
         }
         ctx.restore();
     }
@@ -3042,7 +3061,7 @@ function drawSRBalanceLineChart(srData) {
         const mx = e.clientX - rect.left;
         let found = -1;
         if (mx >= padL && mx <= padL + chartW) {
-            const closest = pts.reduce((best, pt, i) => {
+            const closest = allPts[0].reduce((best, pt, i) => {
                 const dist = Math.abs(mx - pt.x);
                 return dist < best.dist ? { idx: i, dist } : best;
             }, { idx: -1, dist: Infinity });
