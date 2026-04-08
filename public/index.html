@@ -2254,8 +2254,7 @@ function renderDashboard() {
     const top5=[...d].sort((a,b)=>(b.balance||0)-(a.balance||0)).slice(0,5);
     const rc=['t5-r1','t5-r2','t5-r3','t5-r4','t5-r5'];
     document.getElementById('top5Container').innerHTML=top5.map((r,i)=>{
-        const p=r.bought>0?((r.paid/r.bought)*100).toFixed(1):'0';
-        return `<div class="t5-row"><div class="t5-rank ${rc[i]}">${i+1}</div><div><div class="t5-name">${esc(r.customer)}</div><div class="t5-company">${esc(r.company||'--')}</div></div><div class="t5-val">${fmtMoney(r.balance||0)}</div><div class="t5-pct">${p}% cobrado</div></div>`;
+        return `<div class="t5-row"><div class="t5-rank ${rc[i]}">${i+1}</div><div><div class="t5-name">${esc(r.customer)}</div><div class="t5-company">${esc(r.company||'--')}</div></div><div class="t5-val">${fmtMoney(r.balance||0)}</div></div>`;
     }).join('');
 }
 
