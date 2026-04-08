@@ -1209,6 +1209,15 @@
     </div>
     <div id="diffResults" style="display:none">
         <div class="kpi-row" id="diffKpis" style="margin-bottom:20px"></div>
+        <div class="toolbar" style="margin-bottom:16px">
+            <div class="tg">
+                <input type="text" class="search" id="diffSearchClient" placeholder="Buscar cliente..." oninput="applyDiffFilters()">
+            </div>
+            <select id="diffFilterSR" onchange="applyDiffFilters()" style="min-width:160px">
+                <option value="">Todos los SR1</option>
+            </select>
+            <button class="btn btn-g" onclick="clearDiffFilters()" style="font-size:11px;padding:4px 10px">Limpiar</button>
+        </div>
         <div class="card" id="diffChartCard" style="margin-bottom:20px">
             <div class="card-h">
                 <div><span class="card-t">Balance por Representante — Anterior vs Nuevo</span><div class="card-s">Comparativa de Balance USD entre ambos Excel</div></div>
@@ -3304,7 +3313,7 @@ function runDiff(oldData, newData, fileName) {
         newBalance: newSR[name] ? newSR[name].balance : 0,
     }));
 
-    _diffData = { added, removed, changed, fileName, date: new Date(), oldTotals, newTotals, srComparison };
+    _diffData = { added, removed, changed, fileName, date: new Date(), oldTotals, newTotals, srComparison, oldData, newData };
     renderDiff();
 }
 
@@ -3316,6 +3325,15 @@ function renderDiff() {
     document.getElementById('diffEmpty').style.display = 'none';
     document.getElementById('diffResults').style.display = '';
     document.getElementById('diffExportBtn').style.display = '';
+
+    // Populate SR1 filter (only on first load, not on re-filter)
+    const sel = document.getElementById('diffFilterSR');
+    if (sel.options.length <= 1 && _diffData.oldData && _diffData.newData) {
+        const srSet = new Set();
+        _diffData.oldData.forEach(r => { if(r.sr1) srSet.add(cleanSR(r.sr1)); });
+        _diffData.newData.forEach(r => { if(r.sr1) srSet.add(cleanSR(r.sr1)); });
+        [...srSet].sort().forEach(s => { sel.innerHTML += `<option value="${esc(s.toLowerCase())}">${esc(s)}</option>`; });
+    }
 
     const diffBought = newTotals.bought - oldTotals.bought;
     const diffPaid = newTotals.paid - oldTotals.paid;
@@ -3378,6 +3396,64 @@ function renderDiff() {
     if (_diffData.srComparison && _diffData.srComparison.length) {
         drawDiffSRChart(_diffData.srComparison);
     }
+}
+
+function applyDiffFilters() {
+    if (!_diffData) return;
+    const sr = document.getElementById('diffFilterSR').value.toLowerCase();
+    const q = document.getElementById('diffSearchClient').value.toLowerCase().trim();
+
+    const filterFn = (r) => {
+        if (sr && (cleanSR(r.sr1)||'').toLowerCase() !== sr) return false;
+        if (q && !(r.customer||'').toLowerCase().includes(q) && !(r.company||'').toLowerCase().includes(q)) return false;
+        return true;
+    };
+
+    // Re-run diff with filtered data
+    const oldFiltered = _diffData.oldData.filter(filterFn);
+    const newFiltered = _diffData.newData.filter(filterFn);
+
+    // Rebuild diff results from filtered
+    const oldMap = {};
+    oldFiltered.forEach(r => { const k = (r.customer||'').trim().toLowerCase(); if(k) oldMap[k] = r; });
+    const newMap = {};
+    newFiltered.forEach(r => { const k = (r.customer||'').trim().toLowerCase(); if(k) newMap[k] = r; });
+
+    const added = [], removed = [], changed = [];
+    const fields = [{key:'bought',label:'Comprado'},{key:'paid',label:'Cobrado'},{key:'balance',label:'Balance'}];
+
+    Object.keys(newMap).forEach(k => {
+        if (!oldMap[k]) { added.push(newMap[k]); }
+        else {
+            const o = oldMap[k], n = newMap[k], diffs = [];
+            fields.forEach(f => {
+                const ov = o[f.key]||0, nv = n[f.key]||0;
+                if (Math.abs(ov-nv)>0.01) diffs.push({field:f.label,key:f.key,old:ov,new:nv,diff:nv-ov});
+            });
+            if (diffs.length) changed.push({customer:n.customer,company:n.company||o.company,sr1:n.sr1||o.sr1,diffs});
+        }
+    });
+    Object.keys(oldMap).forEach(k => { if (!newMap[k]) removed.push(oldMap[k]); });
+
+    const oldTotals = {bought:oldFiltered.reduce((s,r)=>s+(r.bought||0),0),paid:oldFiltered.reduce((s,r)=>s+(r.paid||0),0),balance:oldFiltered.reduce((s,r)=>s+(r.balance||0),0)};
+    const newTotals = {bought:newFiltered.reduce((s,r)=>s+(r.bought||0),0),paid:newFiltered.reduce((s,r)=>s+(r.paid||0),0),balance:newFiltered.reduce((s,r)=>s+(r.balance||0),0)};
+
+    // SR comparison
+    function aggSR(data){const m={};data.forEach(r=>{const s=cleanSR(r.sr1)||'No Asignado';if(!m[s])m[s]={balance:0};m[s].balance+=r.balance||0;});return m;}
+    const oldSR=aggSR(oldFiltered),newSR=aggSR(newFiltered);
+    const allSRNames=[...new Set([...Object.keys(oldSR),...Object.keys(newSR)])].sort((a,b)=>(newSR[b]?newSR[b].balance:0)-(newSR[a]?newSR[a].balance:0));
+    const srComparison=allSRNames.map(name=>({name,oldBalance:oldSR[name]?oldSR[name].balance:0,newBalance:newSR[name]?newSR[name].balance:0}));
+
+    // Save filtered state but keep raw data
+    const raw = { oldData: _diffData.oldData, newData: _diffData.newData, fileName: _diffData.fileName };
+    _diffData = { ...raw, added, removed, changed, date: _diffData.date, oldTotals, newTotals, srComparison };
+    renderDiff();
+}
+
+function clearDiffFilters() {
+    document.getElementById('diffFilterSR').value = '';
+    document.getElementById('diffSearchClient').value = '';
+    applyDiffFilters();
 }
 
 function drawDiffSRChart(srData) {
