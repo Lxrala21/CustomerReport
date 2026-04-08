@@ -1397,12 +1397,17 @@ const SHEET_MAP = {
     'not assigned': 'notassigned',
 };
 
+function normalizeCol(s) { return String(s).trim().toLowerCase().replace(/[\s_]+/g,''); }
+
 function parseSheet(wb, sheetName) {
     const ws = wb.Sheets[sheetName];
     if (!ws) return [];
     const json = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    if (!json.length) return [];
 
     let headerRow = -1, headerMap = {};
+
+    // Strategy 1: Look for a row whose VALUES contain "Customer" (header row embedded in data)
     for (let i = 0; i < Math.min(json.length, 10); i++) {
         const vals = Object.values(json[i]).map(v => String(v).trim());
         if (vals.includes('Customer')) {
@@ -1411,9 +1416,31 @@ function parseSheet(wb, sheetName) {
             break;
         }
     }
+
+    // Strategy 2: JSON keys themselves ARE the column headers (e.g. "Customer", "TotalPurchased")
+    if (headerRow === -1) {
+        const keys = Object.keys(json[0]);
+        const normKeys = keys.map(normalizeCol);
+        if (normKeys.includes('customer')) {
+            // Build headerMap: map COLS.src (normalized) → actual JSON key
+            const keyLookup = {};
+            keys.forEach(k => { keyLookup[normalizeCol(k)] = k; });
+            COLS.forEach(c => {
+                const norm = normalizeCol(c.src);
+                if (keyLookup[norm]) { headerMap[c.src] = keyLookup[norm]; }
+                else {
+                    // Fuzzy: try without common suffixes (e.g. "Balance USD" → "Balance")
+                    const short = norm.replace(/usd|mxn$/,'');
+                    if (short !== norm && keyLookup[short]) headerMap[c.src] = keyLookup[short];
+                }
+            });
+            headerRow = -2; // flag: use json directly (no slice)
+        }
+    }
+
     if (headerRow === -1) return [];
 
-    const dataRows = json.slice(headerRow + 1);
+    const dataRows = headerRow === -2 ? json : json.slice(headerRow + 1);
     const parsed = [];
     dataRows.forEach(row => {
         const r = {};
