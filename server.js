@@ -84,6 +84,71 @@ const snapshotSchema = new mongoose.Schema({
 
 const Snapshot = mongoose.model('Snapshot', snapshotSchema);
 
+// ── Schema: Users (NFC auth) ──
+const User = mongoose.model('User', new mongoose.Schema({
+    name:      { type: String, required: true },
+    cardUID:   { type: String, required: true, unique: true },
+    role:      { type: String, default: 'viewer', enum: ['admin', 'viewer'] },
+    active:    { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    lastLogin: { type: Date, default: null },
+}, { ...schemaOpts, collection: 'users' }));
+
+// ══════════ AUTH ROUTES (public) ══════════
+
+// GET /api/auth/seed
+app.get('/api/auth/seed', async (req, res) => {
+    try {
+        const count = await User.countDocuments();
+        if (count > 0) return res.json({ ok: false, error: 'Users already exist' });
+        const admin = await User.create({ name: 'Admin', cardUID: '04:AF:2D:D2:84:1C:90', role: 'admin' });
+        res.json({ ok: true, user: { id: admin._id, name: admin.name, role: admin.role } });
+    } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// POST /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { cardUID } = req.body;
+        if (!cardUID) return res.status(400).json({ ok: false, error: 'Se requiere cardUID' });
+        const normalized = cardUID.trim().toUpperCase();
+        const user = await User.findOne({ cardUID: normalized, active: true });
+        if (!user) return res.status(401).json({ ok: false, error: 'Tarjeta no registrada' });
+        user.lastLogin = new Date();
+        await user.save();
+        res.json({ ok: true, user: { id: user._id, name: user.name, role: user.role } });
+    } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// POST /api/auth/register
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { name, cardUID, role } = req.body;
+        if (!name || !cardUID) return res.status(400).json({ ok: false, error: 'Se requiere name y cardUID' });
+        const normalized = cardUID.trim().toUpperCase();
+        const exists = await User.findOne({ cardUID: normalized });
+        if (exists) return res.status(409).json({ ok: false, error: 'Tarjeta ya registrada' });
+        const user = await User.create({ name, cardUID: normalized, role: role || 'viewer' });
+        res.json({ ok: true, user: { id: user._id, name: user.name, role: user.role } });
+    } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// GET /api/auth/users
+app.get('/api/auth/users', async (req, res) => {
+    try {
+        const users = await User.find().sort({ createdAt: -1 }).lean();
+        res.json({ ok: true, data: users.map(u => ({ ...u, cardUID: u.cardUID.slice(0, 8) + '...' })) });
+    } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// DELETE /api/auth/users/:id
+app.delete('/api/auth/users/:id', async (req, res) => {
+    try {
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ ok: true });
+    } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
 // ── Routes ──
 
 // GET /api/customers — Cargar todos (rawdata) - backward compatible

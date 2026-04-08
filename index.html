@@ -116,6 +116,16 @@
         .theme-toggle .icon-sun { display: block; }
         [data-theme="dark"] .theme-toggle { border-color: #3d4149; }
 
+        .user-badge {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 20px;
+            background: var(--bg-hover); border: 1px solid var(--border);
+            font-size: 11.5px; font-weight: 500; color: var(--text-secondary);
+            cursor: pointer; transition: all .2s;
+        }
+        .user-badge:hover { background: #f28b82; color: #fff; border-color: #f28b82; }
+        .user-badge:hover svg { color: #fff; }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg);
@@ -273,6 +283,67 @@
         .kpi-sub {
             font-size: 12px; color: var(--text-muted);
             margin-top: 6px; font-weight: 400;
+        }
+
+        /* ───────── SR1 Balance Cards ───────── */
+        .sr-balance-row {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scroll-snap-type: x mandatory;
+        }
+        .sr-balance-row::-webkit-scrollbar { height: 4px; }
+        .sr-balance-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .sr-bal-card {
+            flex: 0 0 auto;
+            min-width: 180px;
+            max-width: 220px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow .2s, border-color .2s;
+            scroll-snap-align: start;
+        }
+        .sr-bal-card:hover {
+            box-shadow: var(--shadow);
+            border-color: #b87a6a;
+        }
+        .sr-bal-card .sr-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 8px;
+        }
+        .sr-bal-card .sr-balance-val {
+            font-size: 20px;
+            font-weight: 700;
+            color: #b87a6a;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+        .sr-bal-card .sr-balance-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .sr-bal-card .sr-pbar {
+            height: 3px;
+            background: var(--border-light);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .sr-bal-card .sr-pbar-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: #b87a6a;
+            transition: width .6s ease;
         }
 
         /* ───────── Section Cards ───────── */
@@ -707,6 +778,9 @@
             .card-h { padding: 12px 14px; }
             .card-t { font-size: 12.5px; }
             .card-s { font-size: 10.5px; }
+            .sr-bal-card { min-width: 150px; padding: 12px 14px; }
+            .sr-bal-card .sr-balance-val { font-size: 17px; }
+            .sr-bal-card .sr-name { font-size: 11px; }
 
             .mt th, .mt td { padding: 8px 12px; font-size: 12px; }
             .mt th { font-size: 9.5px; }
@@ -773,6 +847,7 @@
 
         @media (max-width: 420px) {
             .kpi-row { grid-template-columns: 1fr; gap: 8px; }
+            .sr-bal-card { min-width: 140px; }
             .kpi {
                 display: flex;
                 align-items: center;
@@ -815,6 +890,10 @@
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
         </button>
+        <div class="user-badge" id="userBadge" title="Cerrar sesion" onclick="logout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="userName"></span>
+        </div>
     </div>
 </header>
 
@@ -864,6 +943,17 @@
         </div>
     </div>
 
+    <!-- ───── SR1 Balance Cards ───── -->
+    <div id="srBalanceCards" style="display:none;margin-bottom:28px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div>
+                <span style="font-size:13.5px;font-weight:600;color:var(--text)">Balance por Representante</span>
+                <span style="font-size:11.5px;color:var(--text-muted);margin-left:8px">Balance USD por SR1</span>
+            </div>
+        </div>
+        <div id="srBalanceCardsRow" class="sr-balance-row"></div>
+    </div>
+
     <!-- ───── Charts Section ───── -->
     <div class="sections" id="chartsSection" style="display:none;grid-template-columns:1fr">
         <div class="card">
@@ -884,6 +974,22 @@
             </div>
             <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
                 <canvas id="srChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-h">
+                <div><span class="card-t">Balance USD por Representante</span><div class="card-s">Comparativa de balance entre SR1s</div></div>
+            </div>
+            <div class="chart-container" style="padding:24px;position:relative;min-height:360px;overflow-x:auto">
+                <canvas id="srBalanceLineChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-h">
+                <div><span class="card-t">Balance por Representante</span><div class="card-s">Balance USD ordenado de mayor a menor</div></div>
+            </div>
+            <div style="padding:16px 24px;position:relative;min-height:200px;max-height:500px;overflow-y:auto">
+                <canvas id="dashHBarChart"></canvas>
             </div>
         </div>
     </div>
@@ -997,6 +1103,13 @@
                 <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#8b8fa3"></div>Comprado</div>
                 <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#5a7d65"></div>Cobrado</div>
                 <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#b87a6a"></div>Balance</div>
+            </div>
+        </div>
+        <div class="tab-chart-card" id="empHBarCard" style="display:none">
+            <div class="tab-chart-title">Balance por Representante</div>
+            <div class="tab-chart-sub">Balance USD ordenado de mayor a menor</div>
+            <div style="position:relative;min-height:300px;padding:16px 0;overflow-y:auto;max-height:500px">
+                <canvas id="chartEmpHBar"></canvas>
             </div>
         </div>
     </div>
@@ -1120,6 +1233,21 @@
 <div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
 
 <script>
+// ══════════ AUTH GUARD ══════════
+const _crUser = sessionStorage.getItem('cr_user');
+if (!_crUser) { window.location.href = '/login.html'; }
+const currentUser = _crUser ? JSON.parse(_crUser) : null;
+
+// Show logged-in user
+if (currentUser) {
+    const el = document.getElementById('userName');
+    if (el) el.textContent = currentUser.name || 'Usuario';
+}
+function logout() {
+    sessionStorage.removeItem('cr_user');
+    window.location.href = '/login.html';
+}
+
 // ══════════ CONFIG ══════════
 const API_BASE = window.location.origin + '/api';
 
@@ -1176,6 +1304,8 @@ function updateChartsTheme() {
     if (hasData && activeTab === 'dashboard') {
         drawMainChart();
         drawSRChart(allData || []);
+        drawSRBalanceLineChart(window._srArr || []);
+        drawHorizontalBarChart('dashHBarChart', allData || []);
     }
 }
 
@@ -1697,6 +1827,140 @@ function renderTabDash(tab, data) {
 
     // Draw chart
     drawBarChart('chart'+T, bought, paid, balance);
+
+    // Horizontal bar chart for employees tab
+    if (tab === 'employees') {
+        document.getElementById('empHBarCard').style.display = '';
+        drawHorizontalBarChart('chartEmpHBar', d);
+    }
+}
+
+// ══════════ HORIZONTAL BAR CHART (SR1 Balance) ══════════
+function drawHorizontalBarChart(canvasId, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Aggregate by SR1
+    const srMap = {};
+    data.forEach(r => {
+        const sr = cleanSR(r.sr1) || 'No Asignado';
+        if (!srMap[sr]) srMap[sr] = { balance: 0, clients: 0 };
+        srMap[sr].balance += r.balance || 0;
+        srMap[sr].clients++;
+    });
+    const bars = Object.entries(srMap)
+        .map(([name, v]) => ({ name, balance: v.balance, clients: v.clients }))
+        .sort((a, b) => b.balance - a.balance);
+
+    if (!bars.length) return;
+
+    const barH = 32;
+    const gap = 8;
+    const padL = 160, padR = 90, padT = 10, padB = 10;
+    const totalH = padT + bars.length * (barH + gap) - gap + padB;
+    const w = container.offsetWidth || 500;
+    const h = Math.max(totalH, 120);
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    container.style.minHeight = h + 'px';
+
+    const chartW = w - padL - padR;
+    const max = Math.max(...bars.map(b => b.balance), 1);
+
+    const barColor = '#8b8fa3';
+    const barHoverColor = '#b87a6a';
+    let hoverIdx = -1;
+
+    function render(ease) {
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        bars.forEach((b, i) => {
+            const y = padT + i * (barH + gap);
+            const barW = max > 0 ? (b.balance / max) * chartW * ease : 0;
+            const isH = hoverIdx === i;
+
+            // Label (left side)
+            ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-secondary');
+            ctx.font = (isH ? '600' : '500') + ' 11.5px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const label = b.name.length > 18 ? b.name.slice(0, 17) + '..' : b.name;
+            ctx.fillText(label, padL - 12, y + barH / 2);
+
+            // Bar
+            if (barW > 0) {
+                if (isH) {
+                    ctx.save();
+                    ctx.shadowColor = isDarkMode() ? 'rgba(184,122,106,.3)' : 'rgba(184,122,106,.15)';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowOffsetY = 2;
+                }
+                const grad = ctx.createLinearGradient(padL, 0, padL + barW, 0);
+                if (isH) {
+                    grad.addColorStop(0, '#b87a6a');
+                    grad.addColorStop(1, '#d4988a');
+                } else {
+                    grad.addColorStop(0, '#8b8fa3');
+                    grad.addColorStop(1, '#a0a4b8');
+                }
+                ctx.fillStyle = grad;
+                const r = Math.min(4, barH / 2);
+                ctx.beginPath();
+                ctx.moveTo(padL, y);
+                ctx.lineTo(padL + barW - r, y);
+                ctx.quadraticCurveTo(padL + barW, y, padL + barW, y + r);
+                ctx.lineTo(padL + barW, y + barH - r);
+                ctx.quadraticCurveTo(padL + barW, y + barH, padL + barW - r, y + barH);
+                ctx.lineTo(padL, y + barH);
+                ctx.closePath();
+                ctx.fill();
+                if (isH) ctx.restore();
+            }
+
+            // Value (right of bar)
+            ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-muted');
+            ctx.font = (isH ? '700' : '600') + ' 11.5px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(fmtFull(b.balance), padL + barW + 8, y + barH / 2);
+        });
+
+        ctx.restore();
+    }
+
+    // Animate entry
+    const dur = 600, startTime = performance.now();
+    function step(now) {
+        const t = Math.min((now - startTime) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        render(ease);
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    // Hover
+    if (canvas._hb_move) canvas.removeEventListener('mousemove', canvas._hb_move);
+    if (canvas._hb_leave) canvas.removeEventListener('mouseleave', canvas._hb_leave);
+    canvas._hb_move = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const my = e.clientY - rect.top;
+        let found = -1;
+        bars.forEach((b, i) => {
+            const y = padT + i * (barH + gap);
+            if (my >= y && my <= y + barH) found = i;
+        });
+        if (found !== hoverIdx) { hoverIdx = found; canvas.style.cursor = found >= 0 ? 'pointer' : 'default'; render(1); }
+    };
+    canvas._hb_leave = function() { hoverIdx = -1; canvas.style.cursor = 'default'; render(1); };
+    canvas.addEventListener('mousemove', canvas._hb_move);
+    canvas.addEventListener('mouseleave', canvas._hb_leave);
 }
 
 // Chart state per canvas
@@ -1708,6 +1972,8 @@ function drawBarChart(canvasId, bought, paid, balance) {
 
     const container = canvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
+    // Reset canvas so container returns to its natural size
+    canvas.style.width = '0'; canvas.style.height = '0';
     const w = container.offsetWidth;
     const h = container.offsetHeight || 200;
     canvas.width = w * dpr;
@@ -1996,6 +2262,22 @@ function renderDashboard() {
     document.getElementById('tbSR').innerHTML=srArr.map(s=>
         `<tr><td style="font-weight:500;color:var(--text)">${esc(s.name)}</td><td class="n">${s.clients}</td><td class="n">${fmtMoney(s.balance)}</td><td class="n">${fmtMoney(s.bought)}</td><td class="n tg-green">${fmtMoney(s.paid)}</td><td class="n">${s.pct.toFixed(1)}%</td></tr>`
     ).join('')+`<tr class="total"><td>TOTAL</td><td class="n">${totSR.clients}</td><td class="n">${fmtMoney(totSR.balance)}</td><td class="n">${fmtMoney(totSR.bought)}</td><td class="n">${fmtMoney(totSR.paid)}</td><td class="n">${totSR.pct.toFixed(1)}%</td></tr>`;
+
+    // SR1 Balance Cards
+    window._srArr = srArr;
+    document.getElementById('srBalanceCards').style.display = '';
+    const maxBal = Math.max(...srArr.map(s => s.balance), 1);
+    document.getElementById('srBalanceCardsRow').innerHTML = srArr.map(s => {
+        const pct = maxBal > 0 ? ((s.balance / maxBal) * 100) : 0;
+        return `<div class="sr-bal-card">
+            <div class="sr-name" title="${esc(s.name)}">${esc(s.name)}</div>
+            <div class="sr-balance-val">${fmtMoney(s.balance)}</div>
+            <div class="sr-balance-sub">${s.clients} clientes · ${s.pct.toFixed(1)}% cobro</div>
+            <div class="sr-pbar"><div class="sr-pbar-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    }).join('');
+    drawSRBalanceLineChart(srArr);
+    drawHorizontalBarChart('dashHBarChart', d);
 
     // Top 5
     const top5=[...d].sort((a,b)=>(b.balance||0)-(a.balance||0)).slice(0,5);
@@ -2532,6 +2814,272 @@ function drawSRChart(data) {
         if (found !== hoverIdx) { hoverIdx = found; canvas.style.cursor = found >= 0 ? 'pointer' : 'default'; render(); }
     };
     canvas._mc_leave = function() { hoverIdx = -1; canvas.style.cursor = 'default'; render(); };
+    canvas.addEventListener('mousemove', canvas._mc_move);
+    canvas.addEventListener('mouseleave', canvas._mc_leave);
+}
+
+// ══════════ SR1 BALANCE LINE CHART ══════════
+function drawSRBalanceLineChart(srData) {
+    const canvas = document.getElementById('srBalanceLineChart');
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(container.offsetWidth, (srData.length || 1) * 100);
+    const h = container.offsetHeight || 300;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
+    if (!srData || !srData.length) {
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '500 14px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('No hay datos de representantes', w / 2, h / 2);
+        ctx.restore();
+        return;
+    }
+
+    const lineColor = '#b87a6a';
+    const lineColorAlt = '#d4988a';
+    const max = Math.max(...srData.map(s => s.balance), 1);
+    const n = srData.length;
+    const padL = 80, padR = 30, padT = 40, padB = 55;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+    const stepX = n > 1 ? chartW / (n - 1) : chartW;
+
+    const pts = srData.map((s, i) => ({
+        x: padL + (n > 1 ? i * stepX : chartW / 2),
+        y: padT + chartH - (max > 0 ? (s.balance / max) * chartH : 0),
+        val: s.balance, name: s.name, clients: s.clients, pct: s.pct, bought: s.bought, paid: s.paid
+    }));
+
+    let hoverCol = -1;
+    let animTime = 0;
+    let dotScales = pts.map(() => 1);
+    let labelOpacities = pts.map(() => 0);
+    let running = true;
+
+    // Stop previous animation loop
+    if (canvas._srbl_stop) canvas._srbl_stop();
+    canvas._srbl_stop = () => { running = false; };
+
+    function render(ease, time) {
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        const pulse = Math.sin(time * 0.003) * 0.5 + 0.5;
+
+        // Y grid with fade-in
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (chartH / 4) * i;
+            const val = max - (max / 4) * i;
+            ctx.globalAlpha = ease;
+            ctx.strokeStyle = getThemeColor('--border-light'); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(w - padR, Math.round(y) + 0.5); ctx.stroke();
+            ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '400 10.5px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtShort(val), padL - 10, y + 4);
+            ctx.globalAlpha = 1;
+        }
+
+        // X labels (SR names)
+        srData.forEach((s, i) => {
+            const x = padL + (n > 1 ? i * stepX : chartW / 2);
+            const isH = hoverCol === i;
+            ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-muted');
+            ctx.font = (isH ? '600' : '400') + ' 10.5px Inter, sans-serif'; ctx.textAlign = 'center';
+            const name = s.name.length > 12 ? s.name.slice(0, 11) + '..' : s.name;
+            ctx.globalAlpha = ease;
+            ctx.fillText(name, x, padT + chartH + 20);
+            ctx.globalAlpha = 1;
+        });
+
+        // Hover column highlight band
+        if (hoverCol >= 0) {
+            const hx = pts[hoverCol].x;
+            const bandW = stepX * 0.6;
+            ctx.fillStyle = isDarkMode() ? 'rgba(184,122,106,.06)' : 'rgba(184,122,106,.04)';
+            ctx.fillRect(hx - bandW / 2, padT, bandW, chartH);
+            ctx.strokeStyle = isDarkMode() ? 'rgba(255,255,255,.12)' : 'rgba(26,29,35,.08)'; ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + chartH); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Animated gradient area fill
+        const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+        const glowAlpha = 0.08 + pulse * 0.04;
+        grad.addColorStop(0, `rgba(184,122,106,${glowAlpha + 0.06})`);
+        grad.addColorStop(0.6, `rgba(184,122,106,${glowAlpha})`);
+        grad.addColorStop(1, 'rgba(184,122,106,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, padT + chartH);
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.lineTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.lineTo(pts[pts.length - 1].x, padT + chartH);
+        ctx.closePath(); ctx.fill();
+
+        // Glow line (wider, blurred behind main line)
+        ctx.save();
+        ctx.strokeStyle = `rgba(184,122,106,${0.15 + pulse * 0.1})`;
+        ctx.lineWidth = 8; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.filter = 'blur(4px)';
+        ctx.beginPath();
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.moveTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.stroke();
+        ctx.restore();
+
+        // Main line with gradient stroke
+        const lineGrad = ctx.createLinearGradient(pts[0].x, 0, pts[pts.length - 1].x, 0);
+        lineGrad.addColorStop(0, lineColorAlt);
+        lineGrad.addColorStop(0.5, lineColor);
+        lineGrad.addColorStop(1, lineColorAlt);
+        ctx.strokeStyle = lineGrad; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.beginPath();
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.moveTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.stroke();
+
+        // Dots with pulse ring + scale animation
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            const isH = hoverCol === i;
+            const targetScale = isH ? 1.5 : 1;
+            dotScales[i] += (targetScale - dotScales[i]) * 0.15;
+            const sc = dotScales[i];
+            const r = 4 * sc;
+
+            // Outer pulse ring on hover
+            if (isH) {
+                const ringR = 12 + pulse * 4;
+                ctx.beginPath(); ctx.arc(pt.x, ey, ringR, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(184,122,106,${0.08 + pulse * 0.06})`; ctx.fill();
+            }
+            // Subtle idle pulse ring
+            if (!isH && ease >= 1) {
+                const idlePulse = Math.sin(time * 0.002 + i * 0.8) * 0.5 + 0.5;
+                ctx.beginPath(); ctx.arc(pt.x, ey, 6 + idlePulse * 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(184,122,106,${0.03 + idlePulse * 0.03})`; ctx.fill();
+            }
+
+            ctx.fillStyle = getThemeColor('--bg-card');
+            ctx.beginPath(); ctx.arc(pt.x, ey, r + 2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = lineColor;
+            ctx.beginPath(); ctx.arc(pt.x, ey, r, 0, Math.PI * 2); ctx.fill();
+            // Inner bright dot
+            ctx.fillStyle = lineColorAlt;
+            ctx.beginPath(); ctx.arc(pt.x, ey, r * 0.4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Floating value labels above dots
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            const isH = hoverCol === i;
+            const targetOp = (ease >= 1 && (isH || hoverCol < 0)) ? 1 : (hoverCol >= 0 && !isH ? 0.3 : 0);
+            labelOpacities[i] += (targetOp - labelOpacities[i]) * 0.12;
+            if (labelOpacities[i] > 0.02) {
+                ctx.globalAlpha = labelOpacities[i] * ease;
+                ctx.fillStyle = getThemeColor('--text'); ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(fmtShort(pt.val), pt.x, ey - 14);
+                ctx.globalAlpha = 1;
+            }
+        });
+
+        // Legend
+        const legendY = h - 8;
+        ctx.fillStyle = lineColor;
+        ctx.beginPath(); ctx.arc(w / 2 - 40, legendY - 3, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('Balance USD', w / 2 - 30, legendY);
+
+        // Tooltip
+        if (hoverCol >= 0 && ease >= 1) {
+            const pt = pts[hoverCol];
+            const tw = 220, th = 80;
+            const tx = Math.max(4, Math.min(pt.x - tw / 2, w - tw - 4));
+            const ey = padT + chartH - (padT + chartH - pt.y);
+            const ty = Math.max(2, ey - th - 28);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.96;
+            roundRect(ctx, tx, ty, tw, th, 10); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 6, ty + th); ctx.lineTo(pt.x, ty + th + 7); ctx.lineTo(pt.x + 6, ty + th);
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#fff'; ctx.font = '600 12px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(pt.name, tx + 14, ty + 18);
+            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif';
+            ctx.fillText(pt.clients + ' clientes · ' + pt.pct.toFixed(1) + '% cobro', tx + 14, ty + 32);
+            ctx.fillStyle = lineColor;
+            ctx.beginPath(); ctx.arc(tx + 18, ty + 50 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Balance:', tx + 28, ty + 50);
+            ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtFull(pt.val), tx + tw - 14, ty + 50);
+            ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Comprado: ' + fmtShort(pt.bought) + '  Cobrado: ' + fmtShort(pt.paid), tx + 14, ty + 67);
+        }
+        ctx.restore();
+    }
+
+    // Continuous animation loop (entry + idle pulse)
+    const dur = 900, startTime = performance.now();
+    function loop(now) {
+        if (!running) return;
+        animTime = now;
+        const t = Math.min((now - startTime) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        render(ease, now);
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    if (canvas._mc_move) canvas.removeEventListener('mousemove', canvas._mc_move);
+    if (canvas._mc_leave) canvas.removeEventListener('mouseleave', canvas._mc_leave);
+    canvas._mc_move = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        let found = -1;
+        if (mx >= padL && mx <= padL + chartW) {
+            const closest = pts.reduce((best, pt, i) => {
+                const dist = Math.abs(mx - pt.x);
+                return dist < best.dist ? { idx: i, dist } : best;
+            }, { idx: -1, dist: Infinity });
+            if (closest.dist < stepX / 2 + 20) found = closest.idx;
+        }
+        if (found !== hoverCol) { hoverCol = found; canvas.style.cursor = found >= 0 ? 'pointer' : 'default'; }
+    };
+    canvas._mc_leave = function() { hoverCol = -1; canvas.style.cursor = 'default'; };
     canvas.addEventListener('mousemove', canvas._mc_move);
     canvas.addEventListener('mouseleave', canvas._mc_leave);
 }
