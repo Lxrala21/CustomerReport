@@ -3162,15 +3162,36 @@ function processDiffFile(file) {
             const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
             // Parse raw data sheet from the new file
             let newData = [];
+            // 1) Try mapped "raw data" sheet
             wb.SheetNames.forEach(sn => {
                 const key = SHEET_MAP[sn.toLowerCase().trim()];
-                if (key === 'rawdata') newData = parseSheet(wb, sn);
+                if (key === 'rawdata' && !newData.length) newData = parseSheet(wb, sn);
             });
+            // 2) Try every sheet until one has data
             if (!newData.length) {
-                // Fallback: try first sheet
-                newData = parseSheet(wb, wb.SheetNames[0]);
+                for (const sn of wb.SheetNames) {
+                    const parsed = parseSheet(wb, sn);
+                    if (parsed.length) { newData = parsed; break; }
+                }
             }
-            if (!newData.length) { toast('No se encontraron datos en el Excel','error'); return; }
+            // 3) Last resort: read first sheet as raw JSON and map columns
+            if (!newData.length) {
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                if (ws) {
+                    const raw = XLSX.utils.sheet_to_json(ws, { defval:'' });
+                    if (raw.length && raw[0].Customer !== undefined) {
+                        newData = raw.map(r => ({
+                            customer: String(r.Customer||r.customer||'').trim(),
+                            company: String(r.Company||r.company||'').trim(),
+                            bought: parseNum(r['Total Purchased']||r.bought||0),
+                            paid: parseNum(r.Paid||r.paid||0),
+                            balance: parseNum(r['Balance USD']||r.balance||0),
+                            sr1: String(r.SR1||r.sr1||'').trim(),
+                        }));
+                    }
+                }
+            }
+            if (!newData.length) { toast('No se encontraron datos con columna "Customer" en el Excel','error'); return; }
 
             runDiff(allData, newData, file.name);
             toast('Comparacion completada','ok');
