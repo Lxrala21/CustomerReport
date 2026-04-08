@@ -1739,6 +1739,25 @@ function renderTabTable(tab) {
         return `<td>${esc(v!=null?String(v):'--')}</td>`;
     }).join('') + '</tr>').join('');
 
+    // Totals row for filtered data
+    const moneyKeys = visCols.filter(c => c.type === 'money').map(c => c.key);
+    if (moneyKeys.length > 0) {
+        const totals = {};
+        moneyKeys.forEach(k => { totals[k] = d.reduce((s, r) => s + (r[k] || 0), 0); });
+        const totRow = '<tr class="total">' + visCols.map(c => {
+            if (moneyKeys.includes(c.key)) {
+                let cls = 'num';
+                if(c.key.startsWith('balance')) cls += ' tg-red';
+                else if(c.key.startsWith('paid')) cls += ' tg-green';
+                else if(c.key.startsWith('bought')) cls += ' tg-amber';
+                return `<td class="${cls}" style="font-weight:700">${fmtMoney(totals[c.key])}</td>`;
+            }
+            if (c === visCols[0]) return `<td style="font-weight:700">TOTAL (${d.length})</td>`;
+            return '<td></td>';
+        }).join('') + '</tr>';
+        body.insertAdjacentHTML('afterbegin', totRow);
+    }
+
     if(totalPages>1) {
         pag.style.display='flex';
         let h = `<button ${st.page===1?'disabled':''} onclick="goTabPage('${tab}',${st.page-1})">‹</button>`;
