@@ -1209,6 +1209,14 @@
     </div>
     <div id="diffResults" style="display:none">
         <div class="kpi-row" id="diffKpis" style="margin-bottom:20px"></div>
+        <div class="card" id="diffChartCard" style="margin-bottom:20px">
+            <div class="card-h">
+                <div><span class="card-t">Balance por Representante — Anterior vs Nuevo</span><div class="card-s">Comparativa de Balance USD entre ambos Excel</div></div>
+            </div>
+            <div class="chart-container" style="padding:24px;position:relative;min-height:380px;overflow-x:auto">
+                <canvas id="diffSRChart"></canvas>
+            </div>
+        </div>
         <div id="diffSections"></div>
     </div>
 </div>
@@ -3273,7 +3281,30 @@ function runDiff(oldData, newData, fileName) {
     const oldTotals = { bought: oldData.reduce((s,r)=>s+(r.bought||0),0), paid: oldData.reduce((s,r)=>s+(r.paid||0),0), balance: oldData.reduce((s,r)=>s+(r.balance||0),0) };
     const newTotals = { bought: newData.reduce((s,r)=>s+(r.bought||0),0), paid: newData.reduce((s,r)=>s+(r.paid||0),0), balance: newData.reduce((s,r)=>s+(r.balance||0),0) };
 
-    _diffData = { added, removed, changed, fileName, date: new Date(), oldTotals, newTotals };
+    // SR1 balance aggregation for both datasets
+    function aggSR(data) {
+        const m = {};
+        data.forEach(r => {
+            const sr = cleanSR(r.sr1) || 'No Asignado';
+            if (!m[sr]) m[sr] = { balance: 0 };
+            m[sr].balance += r.balance || 0;
+        });
+        return m;
+    }
+    const oldSR = aggSR(oldData), newSR = aggSR(newData);
+    // Merge all SR1 names
+    const allSRNames = [...new Set([...Object.keys(oldSR), ...Object.keys(newSR)])].sort((a, b) => {
+        const bNew = (newSR[b] ? newSR[b].balance : 0);
+        const aNew = (newSR[a] ? newSR[a].balance : 0);
+        return bNew - aNew;
+    });
+    const srComparison = allSRNames.map(name => ({
+        name,
+        oldBalance: oldSR[name] ? oldSR[name].balance : 0,
+        newBalance: newSR[name] ? newSR[name].balance : 0,
+    }));
+
+    _diffData = { added, removed, changed, fileName, date: new Date(), oldTotals, newTotals, srComparison };
     renderDiff();
 }
 
@@ -3342,6 +3373,243 @@ function renderDiff() {
     }
 
     document.getElementById('diffSections').innerHTML = html;
+
+    // Draw comparison chart
+    if (_diffData.srComparison && _diffData.srComparison.length) {
+        drawDiffSRChart(_diffData.srComparison);
+    }
+}
+
+function drawDiffSRChart(srData) {
+    const canvas = document.getElementById('diffSRChart');
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = '0'; canvas.style.height = '0';
+    const w = Math.max(container.offsetWidth, srData.length * 120);
+    const h = container.offsetHeight || 340;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
+    if (!srData.length) return;
+
+    const colorOld = '#8b8fa3';
+    const colorOldAlt = '#a0a4b8';
+    const colorNew = '#b87a6a';
+    const colorNewAlt = '#d4988a';
+    const n = srData.length;
+    const max = Math.max(...srData.flatMap(s => [s.oldBalance, s.newBalance]), 1);
+    const padL = 80, padR = 30, padT = 30, padB = 60;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+    const stepX = n > 1 ? chartW / (n - 1) : chartW;
+
+    const oldPts = srData.map((s, i) => ({
+        x: padL + (n > 1 ? i * stepX : chartW / 2),
+        y: padT + chartH - (max > 0 ? (s.oldBalance / max) * chartH : 0),
+        val: s.oldBalance, name: s.name
+    }));
+    const newPts = srData.map((s, i) => ({
+        x: padL + (n > 1 ? i * stepX : chartW / 2),
+        y: padT + chartH - (max > 0 ? (s.newBalance / max) * chartH : 0),
+        val: s.newBalance, name: s.name
+    }));
+
+    let hoverCol = -1;
+
+    function drawLine(ctx, pts, color, colorAlt, fillRgb, ease) {
+        // Area
+        const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+        grad.addColorStop(0, `rgba(${fillRgb},.10)`);
+        grad.addColorStop(1, `rgba(${fillRgb},0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, padT + chartH);
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.lineTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.lineTo(pts[pts.length - 1].x, padT + chartH);
+        ctx.closePath(); ctx.fill();
+
+        // Glow
+        ctx.save();
+        ctx.strokeStyle = `rgba(${fillRgb},.15)`;
+        ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.filter = 'blur(3px)';
+        ctx.beginPath();
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.moveTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.stroke(); ctx.restore();
+
+        // Line
+        const lineGrad = ctx.createLinearGradient(pts[0].x, 0, pts[pts.length - 1].x, 0);
+        lineGrad.addColorStop(0, colorAlt); lineGrad.addColorStop(0.5, color); lineGrad.addColorStop(1, colorAlt);
+        ctx.strokeStyle = lineGrad; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.beginPath();
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            if (i === 0) ctx.moveTo(pt.x, ey);
+            else {
+                const prev = pts[i - 1];
+                const cpx = (prev.x + pt.x) / 2;
+                const prevEy = padT + chartH - (padT + chartH - prev.y) * ease;
+                ctx.bezierCurveTo(cpx, prevEy, cpx, ey, pt.x, ey);
+            }
+        });
+        ctx.stroke();
+
+        // Dots
+        pts.forEach((pt, i) => {
+            const ey = padT + chartH - (padT + chartH - pt.y) * ease;
+            const isH = hoverCol === i;
+            const r = isH ? 5.5 : 3.5;
+            ctx.fillStyle = getThemeColor('--bg-card');
+            ctx.beginPath(); ctx.arc(pt.x, ey, r + 1.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(pt.x, ey, r, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+
+    function render(ease) {
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        // Y grid
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (chartH / 4) * i;
+            const val = max - (max / 4) * i;
+            ctx.strokeStyle = getThemeColor('--border-light'); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(w - padR, Math.round(y) + 0.5); ctx.stroke();
+            ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '400 10.5px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtShort(val), padL - 10, y + 4);
+        }
+
+        // X labels
+        srData.forEach((s, i) => {
+            const x = padL + (n > 1 ? i * stepX : chartW / 2);
+            ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
+            ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif'; ctx.textAlign = 'center';
+            const name = s.name.length > 12 ? s.name.slice(0, 11) + '..' : s.name;
+            ctx.fillText(name, x, padT + chartH + 20);
+        });
+
+        // Hover band
+        if (hoverCol >= 0) {
+            const hx = oldPts[hoverCol].x;
+            ctx.fillStyle = isDarkMode() ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.02)';
+            ctx.fillRect(hx - stepX * 0.3, padT, stepX * 0.6, chartH);
+            ctx.strokeStyle = isDarkMode() ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.06)'; ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + chartH); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Draw lines
+        drawLine(ctx, oldPts, colorOld, colorOldAlt, '139,143,163', ease);
+        drawLine(ctx, newPts, colorNew, colorNewAlt, '184,122,106', ease);
+
+        // Legend
+        const legendY = h - 10;
+        const legendX = w / 2 - 100;
+        [{ c: colorOld, l: 'Anterior' }, { c: colorNew, l: 'Nuevo' }].forEach((s, i) => {
+            const lx = legendX + i * 120;
+            ctx.fillStyle = s.c;
+            ctx.beginPath(); ctx.arc(lx + 5, legendY - 3, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(s.l, lx + 14, legendY);
+        });
+
+        // Tooltip
+        if (hoverCol >= 0 && ease >= 1) {
+            const s = srData[hoverCol];
+            const diff = s.newBalance - s.oldBalance;
+            const tw = 220, th = 82;
+            const hx = oldPts[hoverCol].x;
+            const minY = Math.min(oldPts[hoverCol].y, newPts[hoverCol].y);
+            const tx = Math.max(4, Math.min(hx - tw / 2, w - tw - 4));
+            const ty = Math.max(2, minY - th - 18);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.96;
+            roundRect(ctx, tx, ty, tw, th, 10); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(hx - 5, ty + th); ctx.lineTo(hx, ty + th + 6); ctx.lineTo(hx + 5, ty + th);
+            ctx.closePath(); ctx.fill();
+            ctx.restore(); ctx.globalAlpha = 1;
+
+            ctx.fillStyle = '#fff'; ctx.font = '600 12px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(s.name, tx + 14, ty + 18);
+
+            ctx.fillStyle = colorOld;
+            ctx.beginPath(); ctx.arc(tx + 18, ty + 36 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Anterior:', tx + 28, ty + 36);
+            ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtFull(s.oldBalance), tx + tw - 14, ty + 36);
+
+            ctx.fillStyle = colorNew;
+            ctx.beginPath(); ctx.arc(tx + 18, ty + 52 - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('Nuevo:', tx + 28, ty + 52);
+            ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtFull(s.newBalance), tx + tw - 14, ty + 52);
+
+            const diffColor = diff <= 0 ? '#81c995' : '#f28b82';
+            const sign = diff >= 0 ? '+' : '';
+            ctx.fillStyle = diffColor; ctx.font = '700 11px Inter, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(sign + fmtFull(diff), tx + tw / 2, ty + 72);
+        }
+
+        ctx.restore();
+    }
+
+    // Animate
+    const dur = 800, startTime = performance.now();
+    function step(now) {
+        const t = Math.min((now - startTime) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        render(ease);
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    // Hover
+    if (canvas._dc_move) canvas.removeEventListener('mousemove', canvas._dc_move);
+    if (canvas._dc_leave) canvas.removeEventListener('mouseleave', canvas._dc_leave);
+    canvas._dc_move = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        let found = -1;
+        if (mx >= padL && mx <= padL + chartW) {
+            const closest = oldPts.reduce((best, pt, i) => {
+                const dist = Math.abs(mx - pt.x);
+                return dist < best.dist ? { idx: i, dist } : best;
+            }, { idx: -1, dist: Infinity });
+            if (closest.dist < stepX / 2 + 20) found = closest.idx;
+        }
+        if (found !== hoverCol) { hoverCol = found; canvas.style.cursor = found >= 0 ? 'crosshair' : 'default'; render(1); }
+    };
+    canvas._dc_leave = function() { hoverCol = -1; canvas.style.cursor = 'default'; render(1); };
+    canvas.addEventListener('mousemove', canvas._dc_move);
+    canvas.addEventListener('mouseleave', canvas._dc_leave);
 }
 
 function exportDiff() {
