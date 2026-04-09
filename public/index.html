@@ -3966,12 +3966,15 @@ async function exportDashboard() {
         rows.forEach((r,i) => {
             const rw = i + 6;
             const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
-            const vals = [r.customer||'', r.company||'', r.email||'', r.phone||'', r.bought||0, r.boughtMXN||0, r.paid||0, r.paidMXN||0, r.balance||0, r.balanceMXN||0, r.rate||0, fmtDate(r.firstDate), fmtDate(r.lastDate), r.daysAgo||0, r.sr1||'', r.sr2||''];
+            const fd = r.firstDate ? new Date(r.firstDate) : null;
+            const ld = r.lastDate ? new Date(r.lastDate) : null;
+            const vals = [r.customer||'', r.company||'', r.email||'', r.phone||'', r.bought||0, r.boughtMXN||0, r.paid||0, r.paidMXN||0, r.balance||0, r.balanceMXN||0, r.rate||0, fd, ld, r.daysAgo||0, r.sr1||'', r.sr2||''];
             vals.forEach((v,j) => {
                 const c = ws2.getCell(rw, j+1);
                 c.value = v;
                 if ([4,5,6,7,8,9].includes(j)) c.style = {...bg, ...MONEY};
                 else if (j===10) c.style = {...bg, numFmt:'0.0'};
+                else if ([11,12].includes(j) && v) c.style = {...bg, numFmt:'MMM DD YYYY h:mmAM/PM'};
                 else c.style = bg;
             });
         });
