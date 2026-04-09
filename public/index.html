@@ -1925,19 +1925,21 @@ function drawHorizontalBarChart(canvasId, data) {
     const srMap = {};
     data.forEach(r => {
         const sr = cleanSR(r.sr1) || 'No Asignado';
-        if (!srMap[sr]) srMap[sr] = { balance: 0, clients: 0 };
+        if (!srMap[sr]) srMap[sr] = { balance: 0, bought: 0, clients: 0 };
         srMap[sr].balance += r.balance || 0;
+        srMap[sr].bought += r.bought || 0;
         srMap[sr].clients++;
     });
     const bars = Object.entries(srMap)
-        .map(([name, v]) => ({ name, balance: v.balance, clients: v.clients }))
+        .map(([name, v]) => ({ name, balance: v.balance, bought: v.bought, clients: v.clients, pctPend: v.bought > 0 ? (v.balance / v.bought * 100) : 0 }))
+        .filter(b => b.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
     if (!bars.length) return;
 
     const barH = 32;
     const gap = 8;
-    const padL = 160, padR = 90, padT = 10, padB = 10;
+    const padL = 160, padR = 150, padT = 10, padB = 10;
     const totalH = padT + bars.length * (barH + gap) - gap + padB;
     const w = container.offsetWidth || 500;
     const h = Math.max(totalH, 120);
@@ -2003,12 +2005,12 @@ function drawHorizontalBarChart(canvasId, data) {
                 if (isH) ctx.restore();
             }
 
-            // Value (right of bar)
+            // Value + % Pendiente (right of bar)
             ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-muted');
             ctx.font = (isH ? '700' : '600') + ' 11.5px Inter, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(fmtFull(b.balance), padL + barW + 8, y + barH / 2);
+            ctx.fillText(fmtFull(b.balance) + '  (' + b.pctPend.toFixed(1) + '%)', padL + barW + 8, y + barH / 2);
         });
 
         ctx.restore();
