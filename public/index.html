@@ -2285,9 +2285,10 @@ function renderDashboard() {
     document.getElementById('kNoPay').textContent = noPay.toLocaleString();
     document.getElementById('kClients').textContent = d.length.toLocaleString();
 
-    document.getElementById('kBoughtS').textContent = `Valor acumulado · ${d.length.toLocaleString()} clientes`;
-    document.getElementById('kBalanceS').textContent = `${withBalance} clientes con saldo abierto`;
-    document.getElementById('kPaidS').textContent = `Tasa de cobro: ${pct}%`;
+    const balPctCard=totalBought>0?((totalBalance/totalBought)*100).toFixed(1):0;
+    document.getElementById('kBoughtS').textContent = `100% · ${d.length.toLocaleString()} clientes`;
+    document.getElementById('kBalanceS').textContent = `${balPctCard}% del comprado · ${withBalance} con saldo`;
+    document.getElementById('kPaidS').textContent = `${pct}% del comprado`;
     document.getElementById('kNoPayS').textContent = `Clientes con $0 cobrado`;
     document.getElementById('kClientsS').textContent = `Total importados`;
 
