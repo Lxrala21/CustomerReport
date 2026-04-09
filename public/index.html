@@ -944,6 +944,13 @@
         </div>
     </div>
 
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn" id="btnExportDash" onclick="exportDashboard()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar Reporte
+        </button>
+    </div>
+
     <!-- ───── SR1 Balance Cards ───── -->
     <div id="srBalanceCards" style="display:none;margin-bottom:28px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2296,6 +2303,7 @@ function renderDashboard() {
 
     document.getElementById('sections').style.display = '';
     document.getElementById('chartsSection').style.display = 'grid';
+    document.getElementById('btnExportDash').style.display = '';
 
     // Dashboard charts
     window._dashTotals = { bought: totalBought, paid: totalPaid, balance: totalBalance };
@@ -3791,6 +3799,134 @@ function toggleTheme() {
     document.querySelector('meta[name="theme-color"]').content = newTheme === 'dark' ? '#1a1d23' : '#ffffff';
     // Update charts if they exist
     if (typeof updateChartsTheme === 'function') updateChartsTheme();
+}
+
+// ══════════ EXPORT DASHBOARD (formato Excel original) ══════════
+function exportDashboard() {
+    if (!allData || !allData.length) { toast('No hay datos para exportar','error'); return; }
+
+    const wb = XLSX.utils.book_new();
+    const d = allData;
+    const totalBought = d.reduce((s,r) => s+(r.bought||0), 0);
+    const totalPaid = d.reduce((s,r) => s+(r.paid||0), 0);
+    const totalBalance = d.reduce((s,r) => s+(r.balance||0), 0);
+    const withBalance = d.filter(r => (r.balance||0) > 0).length;
+    const noPay = d.filter(r => (r.paid||0) === 0 && (r.bought||0) > 0).length;
+    const pctCobro = totalBought > 0 ? ((totalPaid/totalBought)*100).toFixed(1) : 0;
+
+    // Helper: format date
+    function fmtDate(dt) { if (!dt) return ''; try { return new Date(dt).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); } catch(e) { return ''; } }
+
+    // ── 1. Dashboard Sheet ──
+    const dash = [];
+    const today = new Date();
+    const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const dateLabel = `${today.getDate()} ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
+
+    dash.push(['DASHBOARD']);
+    dash.push([]);
+    dash.push(['Customer Report  ·  ' + dateLabel]);
+    dash.push([]); dash.push([]); dash.push([]); dash.push([]);
+
+    // KPIs row
+    const r7 = []; r7[0]='Total Purchased (USD)'; r7[5]='Balance (USD)'; r7[10]='No Payment record'; r7[15]='Total Paid (USD)';
+    dash.push(r7);
+    const r8 = []; r8[0]=totalBought; r8[5]=totalBalance; r8[10]=noPay; r8[15]=totalPaid;
+    dash.push(r8);
+    const r9 = []; r9[0]=`Accumulated value · ${d.length.toLocaleString()} clients`; r9[5]=`${withBalance} client with open balance`; r9[10]=`Client By purchase, $0 purchased`; r9[15]=`Collection rate: ${pctCobro}%`;
+    dash.push(r9);
+    dash.push([]); dash.push([]);
+
+    // Recencia
+    dash.push(['RECENTITY OF LAST PURCHASE','','','','','Top 5 Customers — Balance Pending (USD)']);
+    const buckets=[{l:'0-7 días',mn:0,mx:7},{l:'8-30 días',mn:8,mx:30},{l:'31-90 días',mn:31,mx:90},{l:'91-180 días',mn:91,mx:180},{l:'181-365 días',mn:181,mx:365},{l:'365+ días',mn:366,mx:99999}];
+    const rec = buckets.map(b => ({l:b.l, c:d.filter(r=>(r.daysAgo||0)>=b.mn&&(r.daysAgo||0)<=b.mx).length}));
+    rec.forEach(r => r.p = d.length ? (r.c/d.length) : 0);
+
+    // Top 5
+    const top5 = [...d].sort((a,b) => (b.balance||0)-(a.balance||0)).slice(0,5);
+
+    // Header row
+    const rH = ['Period','Client','% Total','','','#','Customer','Company','Total Purchased','Total Paid','Balance USD','% Paid'];
+    dash.push(rH);
+
+    // Data rows (recencia + top5 side by side)
+    for (let i = 0; i < Math.max(rec.length, top5.length); i++) {
+        const row = [];
+        if (i < rec.length) { row[0]=rec[i].l; row[1]=rec[i].c; row[2]=rec[i].p; } else { row[0]=''; row[1]=''; row[2]=''; }
+        row[3]=''; row[4]='';
+        if (i < top5.length) {
+            const t = top5[i];
+            row[5]=i+1; row[6]=t.customer||''; row[7]=t.company||'—'; row[8]=t.bought||0; row[9]=t.paid||0; row[10]=t.balance||0; row[11]=t.bought>0?(t.paid/t.bought):0;
+        }
+        dash.push(row);
+    }
+    // Total recencia
+    const recTotal = rec.reduce((s,r)=>s+r.c,0);
+    const rT = []; rT[0]='TOTAL'; rT[1]=recTotal; rT[2]=recTotal/d.length;
+    rT[6]='TOTAL'; rT[8]=top5.reduce((s,t)=>s+(t.bought||0),0); rT[9]=top5.reduce((s,t)=>s+(t.paid||0),0); rT[10]=top5.reduce((s,t)=>s+(t.balance||0),0);
+    rT[11]=rT[8]>0?(rT[9]/rT[8]):0;
+    dash.push(rT);
+    dash.push([]); dash.push([]);
+
+    // Balance by Representative
+    dash.push(['  BALANCE BY REPRESENTATIVE (SR1)']);
+    dash.push(['Representative','Client','Balance USD','Total Purchased','% Pending']);
+    const srMap = {};
+    d.forEach(r => {
+        const sr = cleanSR(r.sr1) || 'No Asignado';
+        if (!srMap[sr]) srMap[sr] = {clients:0, balance:0, bought:0, paid:0};
+        srMap[sr].clients++; srMap[sr].balance += r.balance||0; srMap[sr].bought += r.bought||0; srMap[sr].paid += r.paid||0;
+    });
+    const srArr = Object.entries(srMap).map(([n,v])=>({name:n,...v})).sort((a,b)=>b.balance-a.balance);
+    srArr.forEach(s => {
+        dash.push([s.name, s.clients, s.balance, s.bought, s.bought>0?(s.balance/s.bought):0]);
+    });
+    dash.push(['TOTAL', d.length, totalBalance, totalBought, totalBought>0?(totalBalance/totalBought):0]);
+
+    const wsDash = XLSX.utils.aoa_to_sheet(dash);
+    // Column widths
+    wsDash['!cols'] = [{wch:22},{wch:10},{wch:12},{wch:4},{wch:4},{wch:4},{wch:28},{wch:18},{wch:18},{wch:16},{wch:16},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsDash, 'Dashboard');
+
+    // ── Helper: create data sheet ──
+    function makeDataSheet(name, rows) {
+        const aoa = [];
+        aoa.push([]); aoa.push([]); aoa.push([name]); aoa.push([]);
+        aoa.push(['Customer','Company','Email','Cellphone','Total Purchased','Total MXN','Paid','Paid MXN','Balance USD','Balance MXN','Exchange Rate','First Purchase Date','Last Purchase Date','Last Purchase Days Ago','SR1','SR2']);
+        rows.forEach(r => {
+            aoa.push([r.customer||'', r.company||'', r.email||'', r.phone||'', r.bought||0, r.boughtMXN||0, r.paid||0, r.paidMXN||0, r.balance||0, r.balanceMXN||0, r.rate||0, fmtDate(r.firstDate), fmtDate(r.lastDate), r.daysAgo||0, r.sr1||'', r.sr2||'']);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{wch:30},{wch:20},{wch:28},{wch:16},{wch:16},{wch:16},{wch:14},{wch:14},{wch:14},{wch:14},{wch:10},{wch:22},{wch:22},{wch:8},{wch:20},{wch:20}];
+        return ws;
+    }
+
+    // ── 2. Balance Details ──
+    const balanceRows = d.filter(r => (r.balance||0) > 0).sort((a,b) => (b.balance||0)-(a.balance||0));
+    XLSX.utils.book_append_sheet(wb, makeDataSheet('Balance Details', balanceRows), 'Balance Details');
+
+    // ── 3. Not Assigned ──
+    const notAssigned = d.filter(r => !r.sr1 || r.sr1.toLowerCase()==='not assigned' || r.sr1==='').sort((a,b) => (b.balance||0)-(a.balance||0));
+    XLSX.utils.book_append_sheet(wb, makeDataSheet('Not Assigned', notAssigned), 'Not Assigned');
+
+    // ── 4. Per-representative sheets ──
+    const repNames = srArr.filter(s => s.name !== 'No Asignado').map(s => s.name);
+    repNames.forEach(name => {
+        const rows = d.filter(r => cleanSR(r.sr1) === name).sort((a,b) => (b.balance||0)-(a.balance||0));
+        if (rows.length > 0) {
+            const sheetName = name.length > 31 ? name.slice(0,31) : name;
+            XLSX.utils.book_append_sheet(wb, makeDataSheet(name, rows), sheetName);
+        }
+    });
+
+    // ── 5. Raw Data ──
+    XLSX.utils.book_append_sheet(wb, makeDataSheet('Raw Data', d), 'Raw Data');
+
+    // Download
+    const fileName = `CustomerReport_${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast('Reporte exportado: ' + fileName, 'success');
 }
 
 // Apply saved theme on load
