@@ -1471,18 +1471,21 @@ function parseSheet(wb, sheetName) {
 
     const dataRows = headerRow === -2 ? json : json.slice(headerRow + 1);
     const parsed = [];
+    // Build fuzzy lookup: normalized headerMap key -> original key
+    const fuzzyMap = {};
+    Object.keys(headerMap).forEach(k => { fuzzyMap[normalizeCol(k)] = headerMap[k]; });
+
     dataRows.forEach(row => {
         const r = {};
         COLS.forEach(c => {
-            const srcKey = headerMap[c.src];
-            if (!srcKey) {
-                const alt = headerMap[c.src.replace('DaysAgo','Days Ago')];
-                if (alt) {
-                    if (c.type==='num'||c.type==='money') r[c.key]=parseNum(row[alt]);
-                    else r[c.key] = row[alt]!=null?String(row[alt]).trim():'';
-                }
-                return;
-            }
+            let srcKey = headerMap[c.src];
+            // Fallback: try normalized match
+            if (!srcKey) srcKey = fuzzyMap[normalizeCol(c.src)];
+            // Fallback: try DaysAgo variant
+            if (!srcKey) srcKey = headerMap[c.src.replace('DaysAgo','Days Ago')];
+            if (!srcKey) srcKey = fuzzyMap[normalizeCol(c.src.replace('DaysAgo','Days Ago'))];
+            if (!srcKey) return;
+
             let v = row[srcKey];
             if (c.type==='money'||c.type==='num') r[c.key]=parseNum(v);
             else if (c.type==='date') r[c.key]=parseDate(v);
@@ -1729,7 +1732,7 @@ function updateDbStatus(connected, count) {
 loadFromMongo();
 
 function parseNum(v){if(v==null||v==='')return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
-function parseDate(v){if(!v)return null;if(v instanceof Date)return v;let s=String(v).trim().replace(/([\d])([AP]M)/i,'$1 $2');const d=new Date(s);return isNaN(d.getTime())?null:d}
+function parseDate(v){if(!v)return null;if(v instanceof Date&&!isNaN(v.getTime()))return v;let s=String(v).trim();if(!s)return null;s=s.replace(/([\d])([AP]M)/i,'$1 $2');s=s.replace(/\s+/g,' ');const d=new Date(s);if(!isNaN(d.getTime()))return d;const m=s.match(/(\w+)\s+(\d+)\s+(\d{4})\s+(\d+:\d+)\s*(AM|PM)?/i);if(m)return new Date(`${m[1]} ${m[2]}, ${m[3]} ${m[4]} ${m[5]||''}`);return null}
 function cleanSR(s){if(!s)return'No Asignado';if(s.toLowerCase()==='not assigned')return'No Asignado';if(s.includes('@'))return s.split('@')[0].replace(/\./g,' ').replace(/\b\w/g,l=>l.toUpperCase());return s}
 
 // ══════════ TAB FILTERS ══════════
