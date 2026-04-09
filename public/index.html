@@ -1729,7 +1729,7 @@ function updateDbStatus(connected, count) {
 loadFromMongo();
 
 function parseNum(v){if(v==null||v==='')return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
-function parseDate(v){if(!v)return null;if(v instanceof Date)return v;const d=new Date(v);return isNaN(d.getTime())?null:d}
+function parseDate(v){if(!v)return null;if(v instanceof Date)return v;let s=String(v).trim().replace(/([\d])([AP]M)/i,'$1 $2');const d=new Date(s);return isNaN(d.getTime())?null:d}
 function cleanSR(s){if(!s)return'No Asignado';if(s.toLowerCase()==='not assigned')return'No Asignado';if(s.includes('@'))return s.split('@')[0].replace(/\./g,' ').replace(/\b\w/g,l=>l.toUpperCase());return s}
 
 // ══════════ TAB FILTERS ══════════
