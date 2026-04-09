@@ -997,8 +997,12 @@
             <table class="mt"><thead><tr><th>Estado</th><th class="n">Clientes</th><th class="n">%</th><th style="width:90px"></th></tr></thead><tbody id="tbEstado"></tbody></table>
         </div>
         <div class="card">
+            <div class="card-h"><span class="card-t">Resumen General</span><span class="card-s">Comprado · Cobrado · Pendiente</span></div>
+            <table class="mt"><thead><tr><th>Concepto</th><th class="n">Total USD</th><th class="n">%</th><th style="width:120px"></th></tr></thead><tbody id="tbResumen"></tbody></table>
+        </div>
+        <div class="card" style="grid-column:1/-1">
             <div class="card-h"><span class="card-t">Balance por Representante</span><span class="card-s">SR1</span></div>
-            <div class="table-scroll"><table class="mt"><thead><tr><th>Representante</th><th class="n">Clientes</th><th class="n">Balance USD</th><th class="n">Comprado</th><th class="n">Cobrado</th><th class="n">% Cobro</th></tr></thead><tbody id="tbSR"></tbody></table></div>
+            <div class="table-scroll"><table class="mt"><thead><tr><th>Representante</th><th class="n">Clientes</th><th class="n">Comprado</th><th class="n">% Comprado</th><th class="n">Cobrado</th><th class="n">% Cobrado</th><th class="n">Balance USD</th><th class="n">% Balance</th><th class="n">% Pendiente</th></tr></thead><tbody id="tbSR"></tbody></table></div>
         </div>
         <div class="card">
             <div class="card-h" style="display:flex;justify-content:space-between;align-items:center"><div><span class="card-t">Top 5 Clientes</span><span class="card-s">Mayor balance pendiente</span></div><div style="text-align:right"><div style="font-size:10px;color:var(--text-muted);font-weight:500">Balance Total</div><div id="top5Total" style="font-size:16px;font-weight:700;color:#b87a6a;font-variant-numeric:tabular-nums">$0</div></div></div>
@@ -2333,9 +2337,27 @@ function renderDashboard() {
     });
     const srArr=Object.entries(srMap).map(([n,v])=>({name:n,...v,pct:v.bought>0?(v.paid/v.bought*100):0})).sort((a,b)=>b.balance-a.balance);
     const totSR={clients:d.length,balance:totalBalance,bought:totalBought,paid:totalPaid,pct:totalBought>0?(totalPaid/totalBought*100):0};
-    document.getElementById('tbSR').innerHTML=srArr.map(s=>
-        `<tr><td style="font-weight:500;color:var(--text)">${esc(s.name)}</td><td class="n">${s.clients}</td><td class="n">${fmtMoney(s.balance)}</td><td class="n">${fmtMoney(s.bought)}</td><td class="n tg-green">${fmtMoney(s.paid)}</td><td class="n">${s.pct.toFixed(1)}%</td></tr>`
-    ).join('')+`<tr class="total"><td>TOTAL</td><td class="n">${totSR.clients}</td><td class="n">${fmtMoney(totSR.balance)}</td><td class="n">${fmtMoney(totSR.bought)}</td><td class="n">${fmtMoney(totSR.paid)}</td><td class="n">${totSR.pct.toFixed(1)}%</td></tr>`;
+    document.getElementById('tbSR').innerHTML=srArr.map(s=>{
+        const pBought=totalBought>0?(s.bought/totalBought*100):0;
+        const pPaid=totalPaid>0?(s.paid/totalPaid*100):0;
+        const pBalance=totalBalance>0?(s.balance/totalBalance*100):0;
+        const pPend=s.bought>0?(s.balance/s.bought*100):0;
+        return `<tr><td style="font-weight:500;color:var(--text)">${esc(s.name)}</td><td class="n">${s.clients}</td><td class="n">${fmtMoney(s.bought)}</td><td class="n">${pBought.toFixed(2)}%</td><td class="n tg-green">${fmtMoney(s.paid)}</td><td class="n">${pPaid.toFixed(2)}%</td><td class="n">${fmtMoney(s.balance)}</td><td class="n">${pBalance.toFixed(2)}%</td><td class="n" style="color:${pPend>15?'var(--negative)':pPend>5?'var(--warning)':'var(--positive)'};font-weight:600">${pPend.toFixed(2)}%</td></tr>`;
+    }).join('')+`<tr class="total"><td>TOTAL</td><td class="n">${totSR.clients}</td><td class="n">${fmtMoney(totSR.bought)}</td><td class="n">100%</td><td class="n">${fmtMoney(totSR.paid)}</td><td class="n">100%</td><td class="n">${fmtMoney(totSR.balance)}</td><td class="n">100%</td><td class="n" style="font-weight:600">${totalBought>0?(totalBalance/totalBought*100).toFixed(2):'0'}%</td></tr>`;
+
+    // Resumen Comprado / Cobrado / Pendiente
+    const pCobrado=totalBought>0?(totalPaid/totalBought*100):0;
+    const pPendiente=totalBought>0?(totalBalance/totalBought*100):0;
+    const resumen=[
+        {label:'Comprado',val:totalBought,pct:100,color:'#8b8fa3'},
+        {label:'Cobrado',val:totalPaid,pct:pCobrado,color:'#5a7d65'},
+        {label:'Pendiente (Balance)',val:totalBalance,pct:pPendiente,color:'#c9a87c'},
+    ];
+    const ajuste=totalBought-totalPaid-totalBalance;
+    const pAjuste=totalBought>0?(ajuste/totalBought*100):0;
+    document.getElementById('tbResumen').innerHTML=resumen.map(r=>
+        `<tr><td style="font-weight:500;color:var(--text)">${r.label}</td><td class="n">${fmtMoney(r.val)}</td><td class="n" style="font-weight:600">${r.pct.toFixed(2)}%</td><td><div class="pbar"><div class="pbar-fill" style="width:${r.pct}%;background:${r.color}"></div></div></td></tr>`
+    ).join('')+(ajuste>0?`<tr><td style="color:var(--text-muted)">Ajustes / Otros</td><td class="n" style="color:var(--text-muted)">${fmtMoney(ajuste)}</td><td class="n" style="color:var(--text-muted)">${pAjuste.toFixed(2)}%</td><td></td></tr>`:'');
 
     // SR1 Balance Cards
     window._srArr = srArr;
