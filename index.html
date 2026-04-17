@@ -4266,71 +4266,204 @@ function toggleTheme() {
     if (typeof updateChartsTheme === 'function') updateChartsTheme();
 }
 
-// ══════════ EXPORT (plantilla plana — CustomerReport template) ══════════
+// ══════════ EXPORT DASHBOARD (ExcelJS con estilos + pestañas) ══════════
 async function exportDashboard() {
     if (!allData || !allData.length) { toast('No hay datos para exportar','error'); return; }
     toast('Generando reporte...','info');
 
-    const fmtMoney = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const d = allData;
+    const isMiguelFerrer = (s) => s && String(s).toLowerCase().includes('miguel.ferrer');
+    const totalBought = d.reduce((s,r) => s+(r.bought||0), 0);
+    const totalPaid = d.reduce((s,r) => s+(r.paid||0), 0);
+    const totalBalance = d.reduce((s,r) => s+(r.balance||0), 0);
+    const withBalance = d.filter(r => (r.balance||0) > 0).length;
+    const noPay = d.filter(r => (r.paid||0) === 0 && (r.bought||0) > 0).length;
+    const pctCobro = totalBought > 0 ? ((totalPaid/totalBought)*100).toFixed(1) : 0;
+    const today = new Date();
+    const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const dateLabel = `${today.getDate()} ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
 
-    // Formato: "Oct 16 2024  5:40PM" (día y hora con padding de espacio)
-    const fmtDateTpl = (dt) => {
-        if (!dt) return '';
-        const d = new Date(dt);
-        if (isNaN(d.getTime())) return '';
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const day = String(d.getDate()).padStart(2, ' ');
-        let h = d.getHours();
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12; if (h === 0) h = 12;
-        const hStr = String(h).padStart(2, ' ');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        return `${months[d.getMonth()]} ${day} ${d.getFullYear()} ${hStr}:${min}${ampm}`;
-    };
+    // Estilos base
+    const HDR = { font:{bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Calibri'}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FF4A5568'}}, alignment:{vertical:'middle'}, border:{bottom:{style:'thin',color:{argb:'FF2D3748'}}} };
+    const TITLE = { font:{bold:true,size:18,name:'Calibri',color:{argb:'FF1A202C'}} };
+    const SUB = { font:{size:12,name:'Calibri',color:{argb:'FF718096'}} };
+    const SECTION = { font:{bold:true,size:13,name:'Calibri',color:{argb:'FF2D3748'}} };
+    const KPI_LBL = { font:{bold:true,size:10,name:'Calibri',color:{argb:'FF4A5568'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const KPI_VAL = { font:{bold:true,size:16,name:'Calibri',color:{argb:'FF1A202C'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}}, numFmt:'$#,##0' };
+    const KPI_SUB = { font:{size:9,name:'Calibri',color:{argb:'FF718096'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const ROW_ODD = { fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFF7F7F7'}} };
+    const ROW_EVEN = { fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const ROW_TOTAL = { font:{bold:true,size:11,name:'Calibri'}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}} };
+    const MONEY = { numFmt:'$#,##0.00' };
+    const MONEY0 = { numFmt:'$#,##0' };
+    const PCT = { numFmt:'0.0%' };
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Customer Report';
-    const ws = wb.addWorksheet('Sheet 1');
+    wb.creator = 'Customer Report Dashboard';
 
-    const headers = ['Customer','Company','Email','cellphone','TotalPurchased','TotalMXN','Paid','PaidMXN','Balance','BalanceMXN','ExchangeRate','FirstPurchaseDate','LastPurchaseDate','LastPurchaseDaysAgo','SR1','SR2','EnteredBy'];
-    ws.addRow(headers);
+    // ════════ DASHBOARD SHEET ════════
+    const ws = wb.addWorksheet('Dashboard', { views:[{showGridLines:false}] });
+    ws.columns = [{width:18},{width:12},{width:14},{width:6},{width:6},{width:6},{width:28},{width:20},{width:18},{width:16},{width:16},{width:13},{width:6},{width:6},{width:6},{width:16},{width:16},{width:16},{width:16}];
 
-    // Miguel Ferrer se mapea a "Not Assigned" en SR1/SR2
-    const mapSR = (s) => {
-        if (!s) return 'Not Assigned';
-        if (String(s).toLowerCase().includes('miguel.ferrer')) return 'Not Assigned';
-        return s;
-    };
+    // Title
+    ws.getRow(1).height = 30;
+    const cTitle = ws.getCell('A1'); cTitle.value = 'DASHBOARD'; cTitle.style = TITLE;
+    ws.getRow(3).height = 20;
+    const cSub = ws.getCell('A3'); cSub.value = 'Customer Report  ·  ' + dateLabel; cSub.style = SUB;
 
-    allData.forEach(r => {
-        ws.addRow([
-            r.customer || '',
-            r.company || '',
-            r.email || '',
-            r.phone || '',
-            fmtMoney(r.bought),
-            fmtMoney(r.boughtMXN),
-            fmtMoney(r.paid),
-            fmtMoney(r.paidMXN),
-            fmtMoney(r.balance),
-            fmtMoney(r.balanceMXN),
-            fmtMoney(r.rate),
-            fmtDateTpl(r.firstDate),
-            fmtDateTpl(r.lastDate),
-            Number(r.daysAgo) || 0,
-            mapSR(r.sr1),
-            mapSR(r.sr2),
-            r.enteredBy || ''
-        ]);
+    // KPI Labels (row 8)
+    ws.mergeCells('A8:D8'); ws.mergeCells('F8:I8'); ws.mergeCells('K8:N8'); ws.mergeCells('P8:S8');
+    [['A8','Total Purchased (USD)'],['F8','Balance (USD)'],['K8','No Payment record'],['P8','Total Paid (USD)']].forEach(([c,v])=>{
+        const cell = ws.getCell(c); cell.value = v; cell.style = KPI_LBL;
     });
 
-    ws.eachRow(row => { row.font = { name: 'Calibri', size: 12 }; });
+    // KPI Values (row 9)
+    ws.mergeCells('A9:D9'); ws.mergeCells('F9:I9'); ws.mergeCells('K9:N9'); ws.mergeCells('P9:S9');
+    ws.getRow(9).height = 28;
+    const kvs = [['A9',totalBought],['F9',totalBalance],['P9',totalPaid]];
+    kvs.forEach(([c,v])=>{ const cell=ws.getCell(c); cell.value=v; cell.style=KPI_VAL; });
+    const cNP = ws.getCell('K9'); cNP.value = noPay; cNP.style = {...KPI_VAL, numFmt:'#,##0'};
 
+    // KPI Subs (row 10)
+    ws.mergeCells('A10:D10'); ws.mergeCells('F10:I10'); ws.mergeCells('K10:N10'); ws.mergeCells('P10:S10');
+    [['A10',`Accumulated value · ${d.length.toLocaleString()} clients`],['F10',`${withBalance} clients with open balance`],['K10',`Clients with $0 collected`],['P10',`Collection rate: ${pctCobro}%`]].forEach(([c,v])=>{
+        const cell = ws.getCell(c); cell.value = v; cell.style = KPI_SUB;
+    });
+
+    // ── Recencia ──
+    let row = 13;
+    ws.getCell(`A${row}`).value = 'RECENTITY OF LAST PURCHASE'; ws.getCell(`A${row}`).style = SECTION;
+    ws.getCell(`F${row}`).value = 'Top 5 Customers — Balance Pending (USD)'; ws.getCell(`F${row}`).style = SECTION;
+    row++;
+
+    const recHdr = ['Period','Clients','% Total','','','#','Customer','Company','Total Purchased','Total Paid','Balance USD','% Paid'];
+    recHdr.forEach((v,i) => { if(v) { const c=ws.getCell(row,i+1); c.value=v; c.style=HDR; } });
+    row++;
+
+    const buckets=[{l:'0-7 días',mn:0,mx:7},{l:'8-30 días',mn:8,mx:30},{l:'31-90 días',mn:31,mx:90},{l:'91-180 días',mn:91,mx:180},{l:'181-365 días',mn:181,mx:365},{l:'365+ días',mn:366,mx:99999}];
+    const rec = buckets.map(b => ({l:b.l, c:d.filter(r=>(r.daysAgo||0)>=b.mn&&(r.daysAgo||0)<=b.mx).length}));
+    rec.forEach(r => r.p = d.length ? (r.c/d.length) : 0);
+    const top5 = [...d].sort((a,b) => (b.balance||0)-(a.balance||0)).slice(0,5);
+
+    for (let i = 0; i < Math.max(rec.length, top5.length); i++) {
+        const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+        if (i < rec.length) {
+            ws.getCell(row,1).value = rec[i].l; ws.getCell(row,1).style = bg;
+            ws.getCell(row,2).value = rec[i].c; ws.getCell(row,2).style = {...bg, alignment:{horizontal:'right'}};
+            ws.getCell(row,3).value = rec[i].p; ws.getCell(row,3).style = {...bg, ...PCT, alignment:{horizontal:'right'}};
+        }
+        if (i < top5.length) {
+            const t = top5[i];
+            ws.getCell(row,6).value = i+1; ws.getCell(row,6).style = {...bg, font:{bold:true}};
+            ws.getCell(row,7).value = t.customer||''; ws.getCell(row,7).style = bg;
+            ws.getCell(row,8).value = t.company||'—'; ws.getCell(row,8).style = bg;
+            ws.getCell(row,9).value = t.bought||0; ws.getCell(row,9).style = {...bg, ...MONEY0};
+            ws.getCell(row,10).value = t.paid||0; ws.getCell(row,10).style = {...bg, ...MONEY0};
+            ws.getCell(row,11).value = t.balance||0; ws.getCell(row,11).style = {...bg, ...MONEY0};
+            ws.getCell(row,12).value = t.bought>0?(t.paid/t.bought):0; ws.getCell(row,12).style = {...bg, ...PCT};
+        }
+        row++;
+    }
+
+    const recTotal = rec.reduce((s,r)=>s+r.c,0);
+    ws.getCell(row,1).value = 'TOTAL'; ws.getCell(row,1).style = ROW_TOTAL;
+    ws.getCell(row,2).value = recTotal; ws.getCell(row,2).style = {...ROW_TOTAL, alignment:{horizontal:'right'}};
+    ws.getCell(row,3).value = d.length>0?(recTotal/d.length):0; ws.getCell(row,3).style = {...ROW_TOTAL, ...PCT, alignment:{horizontal:'right'}};
+    ws.getCell(row,7).value = 'TOTAL'; ws.getCell(row,7).style = ROW_TOTAL;
+    ws.getCell(row,9).value = top5.reduce((s,t)=>s+(t.bought||0),0); ws.getCell(row,9).style = {...ROW_TOTAL, ...MONEY0};
+    ws.getCell(row,10).value = top5.reduce((s,t)=>s+(t.paid||0),0); ws.getCell(row,10).style = {...ROW_TOTAL, ...MONEY0};
+    ws.getCell(row,11).value = top5.reduce((s,t)=>s+(t.balance||0),0); ws.getCell(row,11).style = {...ROW_TOTAL, ...MONEY0};
+    const t5b=top5.reduce((s,t)=>s+(t.bought||0),0); const t5p=top5.reduce((s,t)=>s+(t.paid||0),0);
+    ws.getCell(row,12).value = t5b>0?(t5p/t5b):0; ws.getCell(row,12).style = {...ROW_TOTAL, ...PCT};
+    row += 3;
+
+    // ── Balance by Representative ──
+    ws.getCell(`A${row}`).value = '  BALANCE BY REPRESENTATIVE (SR1)'; ws.getCell(`A${row}`).style = SECTION;
+    row++;
+    const srHdr = ['Representative','Clients','Balance USD','Total Purchased','% Pending'];
+    srHdr.forEach((v,i) => { const c=ws.getCell(row,i+1); c.value=v; c.style=HDR; });
+    row++;
+
+    const srMap = {};
+    d.forEach(r => {
+        const sr = cleanSR(r.sr1) || 'No Asignado';
+        if (!srMap[sr]) srMap[sr] = {clients:0, balance:0, bought:0, paid:0};
+        srMap[sr].clients++; srMap[sr].balance += r.balance||0; srMap[sr].bought += r.bought||0; srMap[sr].paid += r.paid||0;
+    });
+    const srArr = Object.entries(srMap).map(([n,v])=>({name:n,...v})).sort((a,b)=>b.balance-a.balance);
+
+    srArr.forEach((s,i) => {
+        const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+        ws.getCell(row,1).value = s.name; ws.getCell(row,1).style = {...bg, font:{bold:false}};
+        ws.getCell(row,2).value = s.clients; ws.getCell(row,2).style = {...bg, alignment:{horizontal:'right'}};
+        ws.getCell(row,3).value = s.balance; ws.getCell(row,3).style = {...bg, ...MONEY};
+        ws.getCell(row,4).value = s.bought; ws.getCell(row,4).style = {...bg, ...MONEY};
+        ws.getCell(row,5).value = s.bought>0?(s.balance/s.bought):0; ws.getCell(row,5).style = {...bg, ...PCT};
+        row++;
+    });
+
+    // Total SR
+    ws.getCell(row,1).value = 'TOTAL'; ws.getCell(row,1).style = ROW_TOTAL;
+    ws.getCell(row,2).value = d.length; ws.getCell(row,2).style = {...ROW_TOTAL, alignment:{horizontal:'right'}};
+    ws.getCell(row,3).value = totalBalance; ws.getCell(row,3).style = {...ROW_TOTAL, ...MONEY};
+    ws.getCell(row,4).value = totalBought; ws.getCell(row,4).style = {...ROW_TOTAL, ...MONEY};
+    ws.getCell(row,5).value = totalBought>0?(totalBalance/totalBought):0; ws.getCell(row,5).style = {...ROW_TOTAL, ...PCT};
+
+    // ════════ DATA SHEETS (17 cols con EnteredBy) ════════
+    function makeDataSheet(name, rows) {
+        const ws2 = wb.addWorksheet(name, { views:[{showGridLines:false}] });
+        ws2.columns = [{width:32},{width:22},{width:30},{width:16},{width:18},{width:18},{width:16},{width:16},{width:16},{width:16},{width:12},{width:24},{width:24},{width:10},{width:22},{width:22},{width:32}];
+
+        // Title
+        ws2.getCell('A3').value = name; ws2.getCell('A3').style = SECTION;
+
+        // Headers (row 5)
+        const hdrs = ['Customer','Company','Email','Cellphone','Total Purchased','Total MXN','Paid','Paid MXN','Balance USD','Balance MXN','Exchange Rate','First Purchase Date','Last Purchase Date','Last Purchase Days Ago','SR1','SR2','EnteredBy'];
+        hdrs.forEach((v,i) => { const c=ws2.getCell(5,i+1); c.value=v; c.style=HDR; });
+
+        // Data — Miguel Ferrer se muestra como "Not Assigned" en SR1/SR2
+        rows.forEach((r,i) => {
+            const rw = i + 6;
+            const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+            const fd = r.firstDate ? new Date(r.firstDate) : null;
+            const ld = r.lastDate ? new Date(r.lastDate) : null;
+            const sr1Out = isMiguelFerrer(r.sr1) ? 'Not Assigned' : (r.sr1 || '');
+            const sr2Out = isMiguelFerrer(r.sr2) ? 'Not Assigned' : (r.sr2 || '');
+            const vals = [r.customer||'', r.company||'', r.email||'', r.phone||'', r.bought||0, r.boughtMXN||0, r.paid||0, r.paidMXN||0, r.balance||0, r.balanceMXN||0, r.rate||0, fd, ld, r.daysAgo||0, sr1Out, sr2Out, r.enteredBy||''];
+            vals.forEach((v,j) => {
+                const c = ws2.getCell(rw, j+1);
+                c.value = v;
+                if ([4,5,6,7,8,9].includes(j)) c.style = {...bg, ...MONEY};
+                else if (j===10) c.style = {...bg, numFmt:'0.0'};
+                else if ([11,12].includes(j) && v) c.style = {...bg, numFmt:'MMM DD YYYY h:mmAM/PM'};
+                else c.style = bg;
+            });
+        });
+    }
+
+    // Balance Details
+    const balanceRows = d.filter(r => (r.balance||0) > 0).sort((a,b) => (b.balance||0)-(a.balance||0));
+    makeDataSheet('Balance Details', balanceRows);
+
+    // Not Assigned (incluye Miguel Ferrer)
+    const notAssigned = d.filter(r => !r.sr1 || r.sr1.toLowerCase()==='not assigned' || r.sr1==='' || isMiguelFerrer(r.sr1)).sort((a,b) => (b.balance||0)-(a.balance||0));
+    makeDataSheet('Not Assigned', notAssigned);
+
+    // Per-representative (excluye Miguel Ferrer — va en Not Assigned)
+    const repNames = srArr.filter(s => s.name !== 'No Asignado' && s.name !== 'Miguel Ferrer').map(s => s.name);
+    repNames.forEach(name => {
+        const rows = d.filter(r => cleanSR(r.sr1) === name).sort((a,b) => (b.balance||0)-(a.balance||0));
+        if (rows.length > 0) makeDataSheet(name.length > 31 ? name.slice(0,31) : name, rows);
+    });
+
+    // Raw Data
+    makeDataSheet('Raw Data', d);
+
+    // Download
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const today = new Date();
     const fileName = `CustomerReport_${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}.xlsx`;
     a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
