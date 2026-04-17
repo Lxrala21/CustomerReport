@@ -12,11 +12,20 @@ const MONGO_URI = process.env.MONGO_URI;
 let isConnected = false;
 
 async function connectDB() {
-    if (isConnected) return;
-    await mongoose.connect(MONGO_URI);
+    if (isConnected && mongoose.connection.readyState === 1) return;
+    isConnected = false;
+    await mongoose.connect(MONGO_URI, {
+        serverSelectionTimeoutMS: 10000,
+        heartbeatFrequencyMS: 15000,
+    });
     isConnected = true;
     console.log('MongoDB Atlas conectado — customerreport_db');
 }
+
+mongoose.connection.on('disconnected', () => {
+    isConnected = false;
+    console.warn('MongoDB desconectado');
+});
 
 // ── Middleware ──
 app.use(cors());
@@ -63,6 +72,19 @@ Object.entries(TABS).forEach(([key, tab]) => {
         models[key] = mongoose.model(tab.collection, schema);
     }
 });
+
+// ── Previous rawdata (snapshot del import anterior para comparativas) ──
+const PreviousRawdata = mongoose.models.PreviousRawdata || mongoose.model('PreviousRawdata',
+    new mongoose.Schema(customerFields, { ...schemaOpts, collection: 'previousrawdata' })
+);
+const PreviousMeta = mongoose.models.PreviousMeta || mongoose.model('PreviousMeta',
+    new mongoose.Schema({
+        reportTitle: { type: String, default: '' },
+        totalRecords: { type: Number, default: 0 },
+        capturedAt:   { type: Date, default: Date.now },
+        previousImportedAt: { type: Date, default: null },
+    }, { ...schemaOpts, collection: 'previousmeta' })
+);
 
 // ── Schema: Import metadata ──
 const Import = mongoose.models.Import || mongoose.model('Import', new mongoose.Schema({
@@ -174,6 +196,23 @@ app.post('/api/import-all', async (req, res) => {
         if (!tabsData || typeof tabsData !== 'object') {
             return res.status(400).json({ ok: false, error: 'Se requiere objeto tabs con arrays' });
         }
+
+        // Backup de rawdata ANTES de sobrescribir (para comparativa de reporte analista)
+        const prevMeta = await Import.findOne().sort({ importedAt: -1 }).lean();
+        const currentRawdata = await models.rawdata.find().lean();
+        if (currentRawdata.length > 0) {
+            await PreviousRawdata.deleteMany({});
+            const clean = currentRawdata.map(r => { const { _id, ...rest } = r; return rest; });
+            await PreviousRawdata.insertMany(clean, { ordered: false });
+            await PreviousMeta.deleteMany({});
+            await PreviousMeta.create({
+                reportTitle: prevMeta ? (prevMeta.reportTitle || '') : '',
+                totalRecords: currentRawdata.length,
+                capturedAt: new Date(),
+                previousImportedAt: prevMeta ? prevMeta.importedAt : null,
+            });
+        }
+
         const tabCounts = [];
         let totalRecords = 0;
         for (const [key, data] of Object.entries(tabsData)) {
@@ -194,6 +233,17 @@ app.post('/api/import-all', async (req, res) => {
             importedAt: new Date(),
         });
         res.json({ ok: true, tabs: tabCounts, totalRecords });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/previous-rawdata
+app.get('/api/previous-rawdata', async (req, res) => {
+    try {
+        const data = await PreviousRawdata.find().lean();
+        const meta = await PreviousMeta.findOne().sort({ capturedAt: -1 }).lean();
+        res.json({ ok: true, count: data.length, data, meta });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

@@ -12,9 +12,30 @@ const PORT = 3600;
 // ── MongoDB Atlas ──
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://Lxrala:Larala21@finanzasmit.qth6nlx.mongodb.net/customerreport_db?retryWrites=true&w=majority&appName=FinanzasMIT';
 
-mongoose.connect(MONGO_URI)
+// Conexión persistente con reconexión automática
+function connectDB() {
+    mongoose.connect(MONGO_URI, {
+        serverSelectionTimeoutMS: 10000,
+        heartbeatFrequencyMS: 15000,
+    })
     .then(() => console.log('MongoDB Atlas conectado — customerreport_db'))
-    .catch(err => console.error('Error MongoDB:', err.message));
+    .catch(err => {
+        console.error('Error MongoDB:', err.message);
+        console.log('Reintentando conexión en 5s...');
+        setTimeout(connectDB, 5000);
+    });
+}
+
+mongoose.connection.on('disconnected', () => {
+    console.warn('MongoDB desconectado — reintentando...');
+    setTimeout(connectDB, 5000);
+});
+
+mongoose.connection.on('error', (err) => {
+    console.error('MongoDB error:', err.message);
+});
+
+connectDB();
 
 // ── Middleware ──
 app.use(cors());
@@ -58,6 +79,19 @@ Object.entries(TABS).forEach(([key, tab]) => {
     const schema = new mongoose.Schema(customerFields, { ...schemaOpts, collection: tab.collection });
     models[key] = mongoose.model(tab.collection, schema);
 });
+
+// ── Previous rawdata (snapshot del import anterior para comparativas) ──
+const PreviousRawdata = mongoose.model('PreviousRawdata',
+    new mongoose.Schema(customerFields, { ...schemaOpts, collection: 'previousrawdata' })
+);
+const PreviousMeta = mongoose.model('PreviousMeta',
+    new mongoose.Schema({
+        reportTitle: { type: String, default: '' },
+        totalRecords: { type: Number, default: 0 },
+        capturedAt:   { type: Date, default: Date.now },
+        previousImportedAt: { type: Date, default: null },
+    }, { ...schemaOpts, collection: 'previousmeta' })
+);
 
 // ── Schema: Import metadata ──
 const importSchema = new mongoose.Schema({
@@ -226,6 +260,26 @@ app.post('/api/import-all', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Se requiere objeto tabs con arrays' });
         }
 
+        // Backup de rawdata ANTES de sobrescribir (para comparativa de reporte analista)
+        const prevMeta = await Import.findOne().sort({ importedAt: -1 }).lean();
+        const currentRawdata = await models.rawdata.find().lean();
+        if (currentRawdata.length > 0) {
+            await PreviousRawdata.deleteMany({});
+            const clean = currentRawdata.map(r => {
+                const { _id, ...rest } = r;
+                return rest;
+            });
+            await PreviousRawdata.insertMany(clean, { ordered: false });
+            await PreviousMeta.deleteMany({});
+            await PreviousMeta.create({
+                reportTitle: prevMeta ? (prevMeta.reportTitle || '') : '',
+                totalRecords: currentRawdata.length,
+                capturedAt: new Date(),
+                previousImportedAt: prevMeta ? prevMeta.importedAt : null,
+            });
+            console.log(`Backup previousrawdata: ${currentRawdata.length} registros`);
+        }
+
         const tabCounts = [];
         let totalRecords = 0;
 
@@ -252,6 +306,17 @@ app.post('/api/import-all', async (req, res) => {
 
         console.log(`Import completo: ${tabCounts.length} pestañas, ${totalRecords} registros total`);
         res.json({ ok: true, tabs: tabCounts, totalRecords });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/previous-rawdata — Obtener snapshot anterior para comparativa
+app.get('/api/previous-rawdata', async (req, res) => {
+    try {
+        const data = await PreviousRawdata.find().lean();
+        const meta = await PreviousMeta.findOne().sort({ capturedAt: -1 }).lean();
+        res.json({ ok: true, count: data.length, data, meta });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

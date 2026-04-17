@@ -6,13 +6,18 @@
     <title>Customer Report</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a1d23">
+    <link rel="icon" type="image/png" href="/icons/icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CustReport">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -888,6 +893,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Importar Excel
         </button>
+        <button class="btn btn-g" id="btnAnalystReport" onclick="generateAnalystReport()" title="Reporte comparativo anterior vs actual">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Reporte General
+        </button>
         <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
         <span class="h-date" id="dbStatus" style="font-size:11px"></span>
         <span class="h-date" id="headerDate"></span>
@@ -944,6 +953,13 @@
         </div>
     </div>
 
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn" id="btnExportDash" onclick="exportDashboard()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar Reporte
+        </button>
+    </div>
+
     <!-- ───── SR1 Balance Cards ───── -->
     <div id="srBalanceCards" style="display:none;margin-bottom:28px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -962,6 +978,7 @@
                 <div><span class="card-t">Comprado vs Cobrado vs Pendiente</span><div class="card-s">Resumen general por monto</div></div>
                 <div style="display:flex;gap:6px">
                     <button class="btn btn-g" onclick="setMainChart('line')" id="btnChartLine" style="font-size:11px;padding:4px 10px">Lineas</button>
+                    <button class="btn btn-g" onclick="setMainChart('bar')" id="btnChartBar" style="font-size:11px;padding:4px 10px">Barras</button>
                     <button class="btn btn-g" onclick="setMainChart('donut')" id="btnChartDonut" style="font-size:11px;padding:4px 10px">Dona</button>
                 </div>
             </div>
@@ -997,8 +1014,12 @@
             <table class="mt"><thead><tr><th>Estado</th><th class="n">Clientes</th><th class="n">%</th><th style="width:90px"></th></tr></thead><tbody id="tbEstado"></tbody></table>
         </div>
         <div class="card">
+            <div class="card-h"><span class="card-t">Resumen General</span><span class="card-s">Comprado · Cobrado · Pendiente</span></div>
+            <table class="mt"><thead><tr><th>Concepto</th><th class="n">Total USD</th><th class="n">%</th><th style="width:120px"></th></tr></thead><tbody id="tbResumen"></tbody></table>
+        </div>
+        <div class="card" style="grid-column:1/-1">
             <div class="card-h"><span class="card-t">Balance por Representante</span><span class="card-s">SR1</span></div>
-            <div class="table-scroll"><table class="mt"><thead><tr><th>Representante</th><th class="n">Clientes</th><th class="n">Balance USD</th><th class="n">Comprado</th><th class="n">Cobrado</th><th class="n">% Cobro</th></tr></thead><tbody id="tbSR"></tbody></table></div>
+            <div class="table-scroll"><table class="mt"><thead><tr><th>Representante</th><th class="n">Clientes</th><th class="n">Comprado</th><th class="n">% Comprado</th><th class="n">Cobrado</th><th class="n">% Cobrado</th><th class="n">Balance USD</th><th class="n">% Balance</th><th class="n">% Pendiente</th></tr></thead><tbody id="tbSR"></tbody></table></div>
         </div>
         <div class="card">
             <div class="card-h" style="display:flex;justify-content:space-between;align-items:center"><div><span class="card-t">Top 5 Clientes</span><span class="card-s">Mayor balance pendiente</span></div><div style="text-align:right"><div style="font-size:10px;color:var(--text-muted);font-weight:500">Balance Total</div><div id="top5Total" style="font-size:16px;font-weight:700;color:#b87a6a;font-variant-numeric:tabular-nums">$0</div></div></div>
@@ -1310,7 +1331,7 @@ const COLS = [
 ];
 
 const TAB_COLS = {
-    rawdata: ['customer','company','bought','paid','balance','rate','daysAgo','sr1'],
+    rawdata: ['customer','company','email','phone','bought','boughtMXN','paid','paidMXN','balance','balanceMXN','rate','firstDate','lastDate','daysAgo','sr1','sr2'],
     balance: ['customer','company','bought','boughtMXN','paid','paidMXN','balance','balanceMXN','daysAgo','sr1'],
     employees: ['customer','company','bought','paid','balance','daysAgo','sr1'],
     lorena: ['customer','company','bought','paid','balance','daysAgo'],
@@ -1459,18 +1480,21 @@ function parseSheet(wb, sheetName) {
 
     const dataRows = headerRow === -2 ? json : json.slice(headerRow + 1);
     const parsed = [];
+    // Build fuzzy lookup: normalized headerMap key -> original key
+    const fuzzyMap = {};
+    Object.keys(headerMap).forEach(k => { fuzzyMap[normalizeCol(k)] = headerMap[k]; });
+
     dataRows.forEach(row => {
         const r = {};
         COLS.forEach(c => {
-            const srcKey = headerMap[c.src];
-            if (!srcKey) {
-                const alt = headerMap[c.src.replace('DaysAgo','Days Ago')];
-                if (alt) {
-                    if (c.type==='num'||c.type==='money') r[c.key]=parseNum(row[alt]);
-                    else r[c.key] = row[alt]!=null?String(row[alt]).trim():'';
-                }
-                return;
-            }
+            let srcKey = headerMap[c.src];
+            // Fallback: try normalized match
+            if (!srcKey) srcKey = fuzzyMap[normalizeCol(c.src)];
+            // Fallback: try DaysAgo variant
+            if (!srcKey) srcKey = headerMap[c.src.replace('DaysAgo','Days Ago')];
+            if (!srcKey) srcKey = fuzzyMap[normalizeCol(c.src.replace('DaysAgo','Days Ago'))];
+            if (!srcKey) return;
+
             let v = row[srcKey];
             if (c.type==='money'||c.type==='num') r[c.key]=parseNum(v);
             else if (c.type==='date') r[c.key]=parseDate(v);
@@ -1501,6 +1525,31 @@ function processFile(file) {
                     totalRecords += rows.length;
                 }
             });
+
+            // Fallback: si ninguna hoja coincidió con SHEET_MAP (ej. Excel de una sola hoja
+            // llamada "Sheet 1"), intentar parsear la primera hoja como rawdata.
+            if (!Object.keys(tabsData).length) {
+                for (const sn of wb.SheetNames) {
+                    if (sn.toLowerCase().trim() === 'dashboard') continue;
+                    const rows = parseSheet(wb, sn);
+                    if (rows.length > 0) {
+                        tabsData.rawdata = rows;
+                        totalRecords += rows.length;
+                        break;
+                    }
+                }
+            }
+
+            // Si solo tenemos rawdata, auto-derivar las otras 4 pestañas con los mismos
+            // filtros que usa getTabData, para que todas las pestañas se rellenen.
+            if (tabsData.rawdata && !tabsData.balance && !tabsData.employees && !tabsData.lorena && !tabsData.notassigned) {
+                const raw = tabsData.rawdata;
+                tabsData.balance = raw.filter(r => (r.balance || 0) > 0);
+                tabsData.employees = raw.filter(r => r.sr1 && r.sr1.toLowerCase() !== 'not assigned');
+                tabsData.lorena = raw.filter(r => r.sr1 && r.sr1.toLowerCase().includes('lorena'));
+                tabsData.notassigned = raw.filter(r => !r.sr1 || r.sr1.toLowerCase() === 'not assigned');
+                totalRecords += tabsData.balance.length + tabsData.employees.length + tabsData.lorena.length + tabsData.notassigned.length;
+            }
 
             // Raw data es la fuente principal para el frontend
             allData = tabsData.rawdata || [];
@@ -1554,6 +1603,22 @@ function processFile(file) {
 }
 
 // ══════════ MONGODB SYNC ══════════
+function dateToISO(v) {
+    if (!v) return null;
+    if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString();
+    // Si ya es string ISO, validar
+    if (typeof v === 'string') {
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    // Serial Excel
+    if (typeof v === 'number' && v > 1) {
+        const d = parseDate(v);
+        if (d) return d.toISOString();
+    }
+    return null;
+}
+
 function toPayload(rows) {
     return rows.map(r => ({
         customer: r.customer || '',
@@ -1567,8 +1632,8 @@ function toPayload(rows) {
         balance: r.balance || 0,
         balanceMXN: r.balanceMXN || 0,
         rate: r.rate || 0,
-        firstDate: r.firstDate || null,
-        lastDate: r.lastDate || null,
+        firstDate: dateToISO(r.firstDate),
+        lastDate: dateToISO(r.lastDate),
         daysAgo: r.daysAgo || 0,
         sr1: r.sr1 || '',
         sr2: r.sr2 || '',
@@ -1713,11 +1778,113 @@ function updateDbStatus(connected, count) {
     }
 }
 
-// Auto-load from MongoDB on page start
-loadFromMongo();
+// ══════════ AUTO-CONNECT: mantener conexión activa ══════════
+let _retryCount = 0;
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 3000;    // 3s entre reintentos iniciales
+const POLL_INTERVAL = 60000; // 60s polling para detectar nuevos datos
+
+async function autoLoad() {
+    const loaded = await loadFromMongo();
+    if (loaded) {
+        _retryCount = 0;
+        // Polling periódico: revisa si hay datos nuevos
+        startPolling();
+    } else if (_retryCount < MAX_RETRIES) {
+        _retryCount++;
+        console.log(`Reintento ${_retryCount}/${MAX_RETRIES} en ${RETRY_DELAY/1000}s...`);
+        setTimeout(autoLoad, RETRY_DELAY);
+    } else {
+        console.warn('No se pudo conectar después de', MAX_RETRIES, 'intentos');
+        updateDbStatus(false, 0);
+    }
+}
+
+let _pollTimer = null;
+let _lastImport = null;
+
+function startPolling() {
+    if (_pollTimer) return;
+    _pollTimer = setInterval(async () => {
+        try {
+            const res = await fetch(API_BASE + '/status');
+            const json = await res.json();
+            if (!json.ok) return;
+
+            // Si hay un import más reciente, recargar datos
+            if (json.lastImport && json.lastImport !== _lastImport) {
+                if (_lastImport !== null) {
+                    console.log('Nuevo import detectado, recargando datos...');
+                    await loadFromMongo();
+                }
+                _lastImport = json.lastImport;
+            }
+
+            updateDbStatus(json.connected, json.customers || 0);
+        } catch {
+            updateDbStatus(false, 0);
+        }
+    }, POLL_INTERVAL);
+}
+
+// Recargar datos cuando la página vuelve a ser visible (cambio de pestaña del navegador)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && hasData) {
+        // Verificar conexión al volver
+        fetch(API_BASE + '/status').then(r => r.json()).then(json => {
+            if (json.ok) updateDbStatus(json.connected, json.customers || 0);
+        }).catch(() => updateDbStatus(false, 0));
+    }
+});
+
+// Iniciar carga automática
+autoLoad();
 
 function parseNum(v){if(v==null||v==='')return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
-function parseDate(v){if(!v)return null;if(v instanceof Date)return v;const d=new Date(v);return isNaN(d.getTime())?null:d}
+function parseDate(v) {
+    if (v == null || v === '') return null;
+    // Ya es Date válido
+    if (v instanceof Date && !isNaN(v.getTime())) return v;
+    // Número serial de Excel (ej: 45305 = días desde 1/1/1900)
+    if (typeof v === 'number' && v > 1 && v < 200000) {
+        const epoch = new Date(Date.UTC(1899, 11, 30));
+        const ms = epoch.getTime() + v * 86400000;
+        const d = new Date(ms);
+        if (!isNaN(d.getTime())) return d;
+    }
+    let s = String(v).trim();
+    if (!s) return null;
+    // ISO string de MongoDB (ej: "2025-01-15T00:00:00.000Z")
+    if (s.includes('T') && s.includes('Z')) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d;
+    }
+    // String numérico que podría ser serial Excel
+    if (/^\d+(\.\d+)?$/.test(s)) {
+        const n = parseFloat(s);
+        if (n > 1 && n < 200000) {
+            const epoch = new Date(Date.UTC(1899, 11, 30));
+            const d = new Date(epoch.getTime() + n * 86400000);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    s = s.replace(/([\d])([AP]M)/i, '$1 $2');
+    s = s.replace(/\s+/g, ' ');
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+    // "January 15 2025 12:00 AM"
+    const m = s.match(/(\w+)\s+(\d+)\s+(\d{4})\s+(\d+:\d+)\s*(AM|PM)?/i);
+    if (m) return new Date(`${m[1]} ${m[2]}, ${m[3]} ${m[4]} ${m[5] || ''}`);
+    // "15/01/2025" o "01/15/2025"
+    const slash = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (slash) {
+        const [, a, b, y] = slash;
+        // Si a > 12, asumir DD/MM/YYYY
+        const dt = +a > 12 ? new Date(+y, +b - 1, +a) : new Date(+y, +a - 1, +b);
+        if (!isNaN(dt.getTime())) return dt;
+    }
+    return null;
+}
 function cleanSR(s){if(!s)return'No Asignado';if(s.toLowerCase()==='not assigned')return'No Asignado';if(s.includes('@'))return s.split('@')[0].replace(/\./g,' ').replace(/\b\w/g,l=>l.toUpperCase());return s}
 
 // ══════════ TAB FILTERS ══════════
@@ -1822,7 +1989,7 @@ function renderTabTable(tab) {
             else if(c.key.startsWith('bought')&&n>0) cls+=' tg-amber';
             return `<td class="${cls}">${fmtMoney(n)}</td>`;
         }
-        if(c.type==='date') return `<td>${v?v.toLocaleDateString('es-MX'):'--'}</td>`;
+        if(c.type==='date') { const dt = v ? (v instanceof Date ? v : new Date(v)) : null; return `<td>${dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('es-MX') : '--'}</td>`; }
         if(c.type==='num') {
             if(c.key==='rate') return `<td class="num">${v?v.toFixed(2):'--'}</td>`;
             return `<td class="num">${v!=null?v:'--'}</td>`;
@@ -1921,19 +2088,21 @@ function drawHorizontalBarChart(canvasId, data) {
     const srMap = {};
     data.forEach(r => {
         const sr = cleanSR(r.sr1) || 'No Asignado';
-        if (!srMap[sr]) srMap[sr] = { balance: 0, clients: 0 };
+        if (!srMap[sr]) srMap[sr] = { balance: 0, bought: 0, clients: 0 };
         srMap[sr].balance += r.balance || 0;
+        srMap[sr].bought += r.bought || 0;
         srMap[sr].clients++;
     });
     const bars = Object.entries(srMap)
-        .map(([name, v]) => ({ name, balance: v.balance, clients: v.clients }))
+        .map(([name, v]) => ({ name, balance: v.balance, bought: v.bought, clients: v.clients, pctPend: v.bought > 0 ? (v.balance / v.bought * 100) : 0 }))
+        .filter(b => b.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
     if (!bars.length) return;
 
     const barH = 32;
     const gap = 8;
-    const padL = 160, padR = 90, padT = 10, padB = 10;
+    const padL = 160, padR = 150, padT = 10, padB = 10;
     const totalH = padT + bars.length * (barH + gap) - gap + padB;
     const w = container.offsetWidth || 500;
     const h = Math.max(totalH, 120);
@@ -1999,12 +2168,12 @@ function drawHorizontalBarChart(canvasId, data) {
                 if (isH) ctx.restore();
             }
 
-            // Value (right of bar)
+            // Value + % Pendiente (right of bar)
             ctx.fillStyle = isH ? getThemeColor('--text') : getThemeColor('--text-muted');
             ctx.font = (isH ? '700' : '600') + ' 11.5px Inter, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(fmtFull(b.balance), padL + barW + 8, y + barH / 2);
+            ctx.fillText(fmtFull(b.balance) + '  (' + b.pctPend.toFixed(1) + '%)', padL + barW + 8, y + barH / 2);
         });
 
         ctx.restore();
@@ -2281,14 +2450,16 @@ function renderDashboard() {
     document.getElementById('kNoPay').textContent = noPay.toLocaleString();
     document.getElementById('kClients').textContent = d.length.toLocaleString();
 
-    document.getElementById('kBoughtS').textContent = `Valor acumulado · ${d.length.toLocaleString()} clientes`;
-    document.getElementById('kBalanceS').textContent = `${withBalance} clientes con saldo abierto`;
-    document.getElementById('kPaidS').textContent = `Tasa de cobro: ${pct}%`;
+    const balPctCard=totalBought>0?((totalBalance/totalBought)*100).toFixed(1):0;
+    document.getElementById('kBoughtS').textContent = `100% · ${d.length.toLocaleString()} clientes`;
+    document.getElementById('kBalanceS').textContent = `${balPctCard}% del comprado · ${withBalance} con saldo`;
+    document.getElementById('kPaidS').textContent = `${pct}% del comprado`;
     document.getElementById('kNoPayS').textContent = `Clientes con $0 cobrado`;
     document.getElementById('kClientsS').textContent = `Total importados`;
 
     document.getElementById('sections').style.display = '';
     document.getElementById('chartsSection').style.display = 'grid';
+    document.getElementById('btnExportDash').style.display = '';
 
     // Dashboard charts
     window._dashTotals = { bought: totalBought, paid: totalPaid, balance: totalBalance };
@@ -2333,9 +2504,27 @@ function renderDashboard() {
     });
     const srArr=Object.entries(srMap).map(([n,v])=>({name:n,...v,pct:v.bought>0?(v.paid/v.bought*100):0})).sort((a,b)=>b.balance-a.balance);
     const totSR={clients:d.length,balance:totalBalance,bought:totalBought,paid:totalPaid,pct:totalBought>0?(totalPaid/totalBought*100):0};
-    document.getElementById('tbSR').innerHTML=srArr.map(s=>
-        `<tr><td style="font-weight:500;color:var(--text)">${esc(s.name)}</td><td class="n">${s.clients}</td><td class="n">${fmtMoney(s.balance)}</td><td class="n">${fmtMoney(s.bought)}</td><td class="n tg-green">${fmtMoney(s.paid)}</td><td class="n">${s.pct.toFixed(1)}%</td></tr>`
-    ).join('')+`<tr class="total"><td>TOTAL</td><td class="n">${totSR.clients}</td><td class="n">${fmtMoney(totSR.balance)}</td><td class="n">${fmtMoney(totSR.bought)}</td><td class="n">${fmtMoney(totSR.paid)}</td><td class="n">${totSR.pct.toFixed(1)}%</td></tr>`;
+    document.getElementById('tbSR').innerHTML=srArr.map(s=>{
+        const pBought=totalBought>0?(s.bought/totalBought*100):0;
+        const pPaid=totalPaid>0?(s.paid/totalPaid*100):0;
+        const pBalance=totalBalance>0?(s.balance/totalBalance*100):0;
+        const pPend=s.bought>0?(s.balance/s.bought*100):0;
+        return `<tr><td style="font-weight:500;color:var(--text)">${esc(s.name)}</td><td class="n">${s.clients}</td><td class="n">${fmtMoney(s.bought)}</td><td class="n">${pBought.toFixed(2)}%</td><td class="n tg-green">${fmtMoney(s.paid)}</td><td class="n">${pPaid.toFixed(2)}%</td><td class="n">${fmtMoney(s.balance)}</td><td class="n">${pBalance.toFixed(2)}%</td><td class="n" style="color:${pPend>15?'var(--negative)':pPend>5?'var(--warning)':'var(--positive)'};font-weight:600">${pPend.toFixed(2)}%</td></tr>`;
+    }).join('')+`<tr class="total"><td>TOTAL</td><td class="n">${totSR.clients}</td><td class="n">${fmtMoney(totSR.bought)}</td><td class="n">100%</td><td class="n">${fmtMoney(totSR.paid)}</td><td class="n">100%</td><td class="n">${fmtMoney(totSR.balance)}</td><td class="n">100%</td><td class="n" style="font-weight:600">${totalBought>0?(totalBalance/totalBought*100).toFixed(2):'0'}%</td></tr>`;
+
+    // Resumen Comprado / Cobrado / Pendiente
+    const pCobrado=totalBought>0?(totalPaid/totalBought*100):0;
+    const pPendiente=totalBought>0?(totalBalance/totalBought*100):0;
+    const resumen=[
+        {label:'Comprado',val:totalBought,pct:100,color:'#8b8fa3'},
+        {label:'Cobrado',val:totalPaid,pct:pCobrado,color:'#5a7d65'},
+        {label:'Pendiente (Balance)',val:totalBalance,pct:pPendiente,color:'#c9a87c'},
+    ];
+    const ajuste=totalBought-totalPaid-totalBalance;
+    const pAjuste=totalBought>0?(ajuste/totalBought*100):0;
+    document.getElementById('tbResumen').innerHTML=resumen.map(r=>
+        `<tr><td style="font-weight:500;color:var(--text)">${r.label}</td><td class="n">${fmtMoney(r.val)}</td><td class="n" style="font-weight:600">${r.pct.toFixed(2)}%</td><td><div class="pbar"><div class="pbar-fill" style="width:${r.pct}%;background:${r.color}"></div></div></td></tr>`
+    ).join('')+(ajuste>0?`<tr><td style="color:var(--text-muted)">Ajustes / Otros</td><td class="n" style="color:var(--text-muted)">${fmtMoney(ajuste)}</td><td class="n" style="color:var(--text-muted)">${pAjuste.toFixed(2)}%</td><td></td></tr>`:'');
 
     // SR1 Balance Cards
     window._srArr = srArr;
@@ -2375,6 +2564,7 @@ function updateTabCounts() {
 function setMainChart(type) {
     window._mainChartType = type;
     document.getElementById('btnChartLine').classList.toggle('chart-active', type==='line');
+    document.getElementById('btnChartBar').classList.toggle('chart-active', type==='bar');
     document.getElementById('btnChartDonut').classList.toggle('chart-active', type==='donut');
     drawMainChart();
 }
@@ -2384,10 +2574,309 @@ function drawMainChart() {
     if (!t) return;
     if (window._mainChartType === 'donut') {
         drawDonutChart('mainChart', t.bought, t.paid, t.balance);
+    } else if (window._mainChartType === 'bar') {
+        const snaps = window._snapshots || [];
+        drawBarsChart('mainChart', snaps, t);
     } else {
         const snaps = window._snapshots || [];
         drawLineChart('mainChart', snaps);
     }
+}
+
+function drawBarsChart(canvasId, snapshots, currentTotals) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const cs = getComputedStyle(container);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const w = Math.max(0, container.clientWidth - padX);
+    const h = Math.max(0, container.clientHeight - padY) || 272;
+    canvas.style.display = 'block';
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
+    // Si no hay snapshots, usar los totales actuales como un solo punto
+    let data = snapshots && snapshots.length ? snapshots.slice() : [];
+    if (!data.length && currentTotals) {
+        const today = new Date();
+        data = [{
+            date: today,
+            label: today.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
+            bought: currentTotals.bought || 0,
+            paid: currentTotals.paid || 0,
+            balance: currentTotals.balance || 0,
+            clients: (currentTotals.clients || 0),
+        }];
+    }
+
+    if (!data.length) {
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '500 14px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Importa un Excel para crear el primer punto historico', w / 2, h / 2);
+        ctx.restore();
+        return;
+    }
+
+    // Stack: Cobrado (base) + Pendiente (arriba) = Comprado (total)
+    const stackSeries = [
+        { key: 'paid',    label: 'Cobrado',   color: '#5a7d65' },
+        { key: 'balance', label: 'Pendiente', color: '#b87a6a' },
+    ];
+    const legendSeries = [
+        { label: 'Comprado (total)', color: '#8b8fa3', shape: 'line' },
+        ...stackSeries.map(s => ({ label: s.label, color: s.color, shape: 'box' })),
+    ];
+
+    const max = Math.max(...data.map(s => (s.bought || 0)), ...data.map(s => (s.paid||0)+(s.balance||0)), 1);
+    const niceMax = niceCeil(max);
+    const n = data.length;
+
+    const padL = 80, padR = 28, padT = 48, padB = 62;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    // Bar geometry (una sola barra apilada por snapshot)
+    const groupW = chartW / n;
+    const barW = Math.min(64, groupW * 0.55);
+
+    let hoverCol = -1;
+
+    function render(ease) {
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        // Y grid + labels
+        const ySteps = 4;
+        for (let i = 0; i <= ySteps; i++) {
+            const y = padT + (chartH / ySteps) * i;
+            const val = niceMax - (niceMax / ySteps) * i;
+            ctx.strokeStyle = getThemeColor('--border-light'); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(w - padR, Math.round(y) + 0.5); ctx.stroke();
+            ctx.fillStyle = getThemeColor('--text-muted'); ctx.font = '400 10.5px Inter, sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(fmtShort(val), padL - 10, y + 4);
+        }
+
+        // Baseline
+        ctx.strokeStyle = getThemeColor('--border'); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padL, padT + chartH + 0.5);
+        ctx.lineTo(w - padR, padT + chartH + 0.5);
+        ctx.stroke();
+
+        // Hover highlight band
+        if (hoverCol >= 0) {
+            const hx = padL + hoverCol * groupW;
+            ctx.fillStyle = isDarkMode() ? 'rgba(255,255,255,.04)' : 'rgba(26,29,35,.035)';
+            ctx.fillRect(hx, padT, groupW, chartH);
+        }
+
+        // Stacked bars
+        data.forEach((d, i) => {
+            const cx = padL + i * groupW + groupW / 2;
+            const bx = cx - barW / 2;
+            const total = (d.paid || 0) + (d.balance || 0);
+            const totalH = (total / niceMax) * chartH * ease;
+            const baseY = padT + chartH;
+            const r = Math.min(4, barW / 2);
+
+            // Dibujar stack de abajo hacia arriba (paid, balance)
+            let accum = 0;
+            const segGeom = [];
+            stackSeries.forEach((s, si) => {
+                const v = d[s.key] || 0;
+                const segH = (v / niceMax) * chartH * ease;
+                if (segH <= 0) { segGeom.push(null); return; }
+                const segY = baseY - (accum + segH);
+                const segX = bx;
+                const isTop = si === stackSeries.length - 1;
+
+                // Gradient
+                const grad = ctx.createLinearGradient(0, segY, 0, segY + segH);
+                grad.addColorStop(0, s.color);
+                grad.addColorStop(1, shade(s.color, -12));
+                ctx.fillStyle = grad;
+
+                if (isTop) {
+                    roundRectTop(ctx, segX, segY, barW, segH, r);
+                } else {
+                    ctx.beginPath();
+                    ctx.rect(segX, segY, barW, segH);
+                }
+                ctx.fill();
+
+                // Divider line entre segmentos
+                if (!isTop && segH > 1) {
+                    ctx.fillStyle = isDarkMode() ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.35)';
+                    ctx.fillRect(segX, segY - 0.5, barW, 1);
+                }
+
+                segGeom.push({ v, segX, segY, segH, color: s.color });
+                accum += segH;
+            });
+
+            // Etiquetas DENTRO de cada segmento (Cobrado / Pendiente)
+            if (ease >= 0.85) {
+                segGeom.forEach((g, si) => {
+                    if (!g || g.segH < 18 || g.v <= 0) return;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '600 10.5px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+                    ctx.shadowBlur = 2;
+                    ctx.fillText(fmtShort(g.v), cx, g.segY + g.segH / 2);
+                    ctx.shadowBlur = 0;
+                });
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            // Etiqueta "Total" + Comprado encima de la barra
+            if (ease >= 0.85 && total > 0) {
+                const topY = baseY - totalH;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = getThemeColor('--text-muted');
+                ctx.font = '500 9.5px Inter, sans-serif';
+                ctx.fillText('TOTAL', cx, topY - 20);
+                ctx.fillStyle = getThemeColor('--text');
+                ctx.font = '700 12px Inter, sans-serif';
+                ctx.fillText(fmtShort(d.bought || total), cx, topY - 6);
+            }
+
+            // X label (fecha)
+            ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
+            ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            const dateLabel = d.label || new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+            ctx.fillText(dateLabel, cx, padT + chartH + 20);
+        });
+
+        // Legend
+        const legendY = h - 8;
+        const legendStartX = w / 2 - 180;
+        legendSeries.forEach((s, i) => {
+            const lx = legendStartX + i * 130;
+            ctx.fillStyle = s.color;
+            if (s.shape === 'line') {
+                ctx.fillRect(lx, legendY - 6, 12, 2);
+            } else {
+                roundRect(ctx, lx, legendY - 10, 10, 10, 2); ctx.fill();
+            }
+            ctx.fillStyle = getThemeColor('--text-secondary'); ctx.font = '500 11px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(s.label, lx + 16, legendY - 1);
+        });
+
+        // Tooltip
+        if (hoverCol >= 0 && ease >= 1) {
+            const d = data[hoverCol];
+            const cx = padL + hoverCol * groupW + groupW / 2;
+            const tw = 230, th = 112;
+            const tx = Math.max(4, Math.min(cx - tw / 2, w - tw - 4));
+            const total = (d.paid || 0) + (d.balance || 0);
+            const topY = padT + chartH - (total / niceMax) * chartH;
+            const ty = Math.max(2, topY - th - 18);
+
+            ctx.fillStyle = isDarkMode() ? '#2d3039' : '#1a1d23'; ctx.globalAlpha = 0.94;
+            roundRect(ctx, tx, ty, tw, th, 8); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx - 5, ty + th); ctx.lineTo(cx, ty + th + 5); ctx.lineTo(cx + 5, ty + th);
+            ctx.closePath(); ctx.fill();
+            ctx.globalAlpha = 1;
+
+            const dateStr = d.label || new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+            ctx.fillStyle = '#fff'; ctx.font = '600 12px Inter, sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(dateStr, tx + 14, ty + 18);
+            if (d.clients != null) {
+                ctx.fillStyle = '#9aa0a6'; ctx.font = '400 10px Inter, sans-serif';
+                ctx.fillText(d.clients + ' clientes', tx + 14, ty + 32);
+            }
+
+            const ttRows = [
+                { label: 'Comprado',  val: d.bought || 0,  color: '#8b8fa3' },
+                { label: 'Cobrado',   val: d.paid || 0,    color: '#5a7d65' },
+                { label: 'Pendiente', val: d.balance || 0, color: '#b87a6a' },
+            ];
+            ttRows.forEach((s, si) => {
+                const ly = ty + 50 + si * 16;
+                ctx.fillStyle = s.color;
+                ctx.beginPath(); ctx.arc(tx + 18, ly - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#bdc1c6'; ctx.font = '400 11px Inter, sans-serif'; ctx.textAlign = 'left';
+                ctx.fillText(s.label + ':', tx + 28, ly);
+                ctx.fillStyle = '#fff'; ctx.font = '600 11px Inter, sans-serif'; ctx.textAlign = 'right';
+                ctx.fillText(fmtFull(s.val), tx + tw - 14, ly);
+            });
+        }
+
+        ctx.restore();
+    }
+
+    // Animate
+    const dur = 650, startTime = performance.now();
+    function step(now) {
+        const t = Math.min((now - startTime) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        render(ease);
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    // Hover
+    if (canvas._bc_move) canvas.removeEventListener('mousemove', canvas._bc_move);
+    if (canvas._bc_leave) canvas.removeEventListener('mouseleave', canvas._bc_leave);
+    canvas._bc_move = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        let found = -1;
+        if (mx >= padL && mx <= padL + chartW) {
+            found = Math.min(n - 1, Math.max(0, Math.floor((mx - padL) / groupW)));
+        }
+        if (found !== hoverCol) { hoverCol = found; canvas.style.cursor = found >= 0 ? 'pointer' : 'default'; render(1); }
+    };
+    canvas._bc_leave = function() { hoverCol = -1; canvas.style.cursor = 'default'; render(1); };
+    canvas.addEventListener('mousemove', canvas._bc_move);
+    canvas.addEventListener('mouseleave', canvas._bc_leave);
+}
+
+function niceCeil(v) {
+    if (v <= 0) return 1;
+    const exp = Math.pow(10, Math.floor(Math.log10(v)));
+    const f = v / exp;
+    let nice;
+    if (f <= 1) nice = 1;
+    else if (f <= 2) nice = 2;
+    else if (f <= 2.5) nice = 2.5;
+    else if (f <= 5) nice = 5;
+    else nice = 10;
+    return nice * exp;
+}
+
+function roundRectTop(ctx, x, y, w, h, r) {
+    if (h <= 0) { ctx.beginPath(); return; }
+    r = Math.min(r, w / 2, h);
+    ctx.beginPath();
+    ctx.moveTo(x, y + h);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h);
+    ctx.closePath();
+}
+
+function shade(hex, pct) {
+    const m = hex.replace('#', '');
+    const n = parseInt(m, 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const mix = (c) => Math.max(0, Math.min(255, Math.round(c + (pct / 100) * (pct > 0 ? 255 - c : c))));
+    r = mix(r); g = mix(g); b = mix(b);
+    return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
 }
 
 function drawLineChart(canvasId, snapshots) {
@@ -2395,8 +2884,12 @@ function drawLineChart(canvasId, snapshots) {
     if (!canvas) return;
     const container = canvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
-    const w = container.offsetWidth;
-    const h = container.offsetHeight || 300;
+    const cs = getComputedStyle(container);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const w = Math.max(0, container.clientWidth - padX);
+    const h = Math.max(0, container.clientHeight - padY) || 272;
+    canvas.style.display = 'block';
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = w + 'px';
@@ -2610,8 +3103,12 @@ function drawDonutChart(canvasId, bought, paid, balance) {
     if (!canvas) return;
     const container = canvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
-    const w = container.offsetWidth;
-    const h = container.offsetHeight || 300;
+    const cs = getComputedStyle(container);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const w = Math.max(0, container.clientWidth - padX);
+    const h = Math.max(0, container.clientHeight - padY) || 272;
+    canvas.style.display = 'block';
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = w + 'px';
@@ -3726,7 +4223,7 @@ function exportTab(tab) {
     const exp = d.map(r => {
         const o={};
         visCols.forEach(c=>{
-            if(c.type==='date') o[c.label]=r[c.key]?r[c.key].toLocaleDateString('es-MX'):'';
+            if(c.type==='date') { const dt = r[c.key] ? (r[c.key] instanceof Date ? r[c.key] : new Date(r[c.key])) : null; o[c.label] = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('es-MX') : ''; }
             else if(c.key==='sr1') o[c.label]=cleanSR(r[c.key]);
             else o[c.label]=r[c.key]!=null?r[c.key]:'';
         });
@@ -3768,6 +4265,213 @@ function toggleTheme() {
     if (typeof updateChartsTheme === 'function') updateChartsTheme();
 }
 
+// ══════════ EXPORT DASHBOARD (ExcelJS con estilos) ══════════
+async function exportDashboard() {
+    if (!allData || !allData.length) { toast('No hay datos para exportar','error'); return; }
+    toast('Generando reporte...','info');
+
+    const d = allData;
+    const totalBought = d.reduce((s,r) => s+(r.bought||0), 0);
+    const totalPaid = d.reduce((s,r) => s+(r.paid||0), 0);
+    const totalBalance = d.reduce((s,r) => s+(r.balance||0), 0);
+    const withBalance = d.filter(r => (r.balance||0) > 0).length;
+    const noPay = d.filter(r => (r.paid||0) === 0 && (r.bought||0) > 0).length;
+    const pctCobro = totalBought > 0 ? ((totalPaid/totalBought)*100).toFixed(1) : 0;
+    const today = new Date();
+    const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const dateLabel = `${today.getDate()} ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
+
+    function fmtDate(dt) { if (!dt) return ''; try { return new Date(dt).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); } catch(e) { return ''; } }
+
+    // Estilos base
+    const HDR = { font:{bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Calibri'}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FF4A5568'}}, alignment:{vertical:'middle'}, border:{bottom:{style:'thin',color:{argb:'FF2D3748'}}} };
+    const TITLE = { font:{bold:true,size:18,name:'Calibri',color:{argb:'FF1A202C'}} };
+    const SUB = { font:{size:12,name:'Calibri',color:{argb:'FF718096'}} };
+    const SECTION = { font:{bold:true,size:13,name:'Calibri',color:{argb:'FF2D3748'}} };
+    const KPI_LBL = { font:{bold:true,size:10,name:'Calibri',color:{argb:'FF4A5568'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const KPI_VAL = { font:{bold:true,size:16,name:'Calibri',color:{argb:'FF1A202C'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}}, numFmt:'$#,##0' };
+    const KPI_SUB = { font:{size:9,name:'Calibri',color:{argb:'FF718096'}}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const ROW_ODD = { fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFF7F7F7'}} };
+    const ROW_EVEN = { fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}} };
+    const ROW_TOTAL = { font:{bold:true,size:11,name:'Calibri'}, fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}} };
+    const MONEY = { numFmt:'$#,##0.00' };
+    const MONEY0 = { numFmt:'$#,##0' };
+    const PCT = { numFmt:'0.0%' };
+    const THIN_B = { bottom:{style:'thin',color:{argb:'FFE2E8F0'}} };
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Customer Report Dashboard';
+
+    // ════════ DASHBOARD SHEET ════════
+    const ws = wb.addWorksheet('Dashboard', { views:[{showGridLines:false}] });
+    ws.columns = [{width:18},{width:12},{width:14},{width:6},{width:6},{width:6},{width:28},{width:20},{width:18},{width:16},{width:16},{width:13},{width:6},{width:6},{width:6},{width:16},{width:16},{width:16},{width:16}];
+
+    // Title
+    ws.getRow(1).height = 30;
+    const cTitle = ws.getCell('A1'); cTitle.value = 'DASHBOARD'; cTitle.style = TITLE;
+    ws.getRow(3).height = 20;
+    const cSub = ws.getCell('A3'); cSub.value = 'Customer Report  ·  ' + dateLabel; cSub.style = SUB;
+
+    // KPI Labels (row 8)
+    ws.mergeCells('A8:D8'); ws.mergeCells('F8:I8'); ws.mergeCells('K8:N8'); ws.mergeCells('P8:S8');
+    [['A8','Total Purchased (USD)'],['F8','Balance (USD)'],['K8','No Payment record'],['P8','Total Paid (USD)']].forEach(([c,v])=>{
+        const cell = ws.getCell(c); cell.value = v; cell.style = KPI_LBL;
+    });
+
+    // KPI Values (row 9)
+    ws.mergeCells('A9:D9'); ws.mergeCells('F9:I9'); ws.mergeCells('K9:N9'); ws.mergeCells('P9:S9');
+    ws.getRow(9).height = 28;
+    const kvs = [['A9',totalBought],['F9',totalBalance],['P9',totalPaid]];
+    kvs.forEach(([c,v])=>{ const cell=ws.getCell(c); cell.value=v; cell.style=KPI_VAL; });
+    const cNP = ws.getCell('K9'); cNP.value = noPay; cNP.style = {...KPI_VAL, numFmt:'#,##0'};
+
+    // KPI Subs (row 10)
+    ws.mergeCells('A10:D10'); ws.mergeCells('F10:I10'); ws.mergeCells('K10:N10'); ws.mergeCells('P10:S10');
+    [['A10',`Accumulated value · ${d.length.toLocaleString()} clients`],['F10',`${withBalance} clients with open balance`],['K10',`Clients with $0 collected`],['P10',`Collection rate: ${pctCobro}%`]].forEach(([c,v])=>{
+        const cell = ws.getCell(c); cell.value = v; cell.style = KPI_SUB;
+    });
+
+    // ── Recencia ──
+    let row = 13;
+    ws.getCell(`A${row}`).value = 'RECENTITY OF LAST PURCHASE'; ws.getCell(`A${row}`).style = SECTION;
+    ws.getCell(`F${row}`).value = 'Top 5 Customers — Balance Pending (USD)'; ws.getCell(`F${row}`).style = SECTION;
+    row++;
+
+    // Headers
+    const recHdr = ['Period','Clients','% Total','','','#','Customer','Company','Total Purchased','Total Paid','Balance USD','% Paid'];
+    recHdr.forEach((v,i) => { if(v) { const c=ws.getCell(row,i+1); c.value=v; c.style=HDR; } });
+    row++;
+
+    // Buckets
+    const buckets=[{l:'0-7 días',mn:0,mx:7},{l:'8-30 días',mn:8,mx:30},{l:'31-90 días',mn:31,mx:90},{l:'91-180 días',mn:91,mx:180},{l:'181-365 días',mn:181,mx:365},{l:'365+ días',mn:366,mx:99999}];
+    const rec = buckets.map(b => ({l:b.l, c:d.filter(r=>(r.daysAgo||0)>=b.mn&&(r.daysAgo||0)<=b.mx).length}));
+    rec.forEach(r => r.p = d.length ? (r.c/d.length) : 0);
+    const top5 = [...d].sort((a,b) => (b.balance||0)-(a.balance||0)).slice(0,5);
+
+    for (let i = 0; i < Math.max(rec.length, top5.length); i++) {
+        const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+        if (i < rec.length) {
+            ws.getCell(row,1).value = rec[i].l; ws.getCell(row,1).style = bg;
+            ws.getCell(row,2).value = rec[i].c; ws.getCell(row,2).style = {...bg, alignment:{horizontal:'right'}};
+            ws.getCell(row,3).value = rec[i].p; ws.getCell(row,3).style = {...bg, ...PCT, alignment:{horizontal:'right'}};
+        }
+        if (i < top5.length) {
+            const t = top5[i];
+            ws.getCell(row,6).value = i+1; ws.getCell(row,6).style = {...bg, font:{bold:true}};
+            ws.getCell(row,7).value = t.customer||''; ws.getCell(row,7).style = bg;
+            ws.getCell(row,8).value = t.company||'—'; ws.getCell(row,8).style = bg;
+            ws.getCell(row,9).value = t.bought||0; ws.getCell(row,9).style = {...bg, ...MONEY0};
+            ws.getCell(row,10).value = t.paid||0; ws.getCell(row,10).style = {...bg, ...MONEY0};
+            ws.getCell(row,11).value = t.balance||0; ws.getCell(row,11).style = {...bg, ...MONEY0};
+            ws.getCell(row,12).value = t.bought>0?(t.paid/t.bought):0; ws.getCell(row,12).style = {...bg, ...PCT};
+        }
+        row++;
+    }
+
+    // Total recencia
+    const recTotal = rec.reduce((s,r)=>s+r.c,0);
+    ws.getCell(row,1).value = 'TOTAL'; ws.getCell(row,1).style = ROW_TOTAL;
+    ws.getCell(row,2).value = recTotal; ws.getCell(row,2).style = {...ROW_TOTAL, alignment:{horizontal:'right'}};
+    ws.getCell(row,3).value = d.length>0?(recTotal/d.length):0; ws.getCell(row,3).style = {...ROW_TOTAL, ...PCT, alignment:{horizontal:'right'}};
+    ws.getCell(row,7).value = 'TOTAL'; ws.getCell(row,7).style = ROW_TOTAL;
+    ws.getCell(row,9).value = top5.reduce((s,t)=>s+(t.bought||0),0); ws.getCell(row,9).style = {...ROW_TOTAL, ...MONEY0};
+    ws.getCell(row,10).value = top5.reduce((s,t)=>s+(t.paid||0),0); ws.getCell(row,10).style = {...ROW_TOTAL, ...MONEY0};
+    ws.getCell(row,11).value = top5.reduce((s,t)=>s+(t.balance||0),0); ws.getCell(row,11).style = {...ROW_TOTAL, ...MONEY0};
+    const t5b=top5.reduce((s,t)=>s+(t.bought||0),0); const t5p=top5.reduce((s,t)=>s+(t.paid||0),0);
+    ws.getCell(row,12).value = t5b>0?(t5p/t5b):0; ws.getCell(row,12).style = {...ROW_TOTAL, ...PCT};
+    row += 3;
+
+    // ── Balance by Representative ──
+    ws.getCell(`A${row}`).value = '  BALANCE BY REPRESENTATIVE (SR1)'; ws.getCell(`A${row}`).style = SECTION;
+    row++;
+    const srHdr = ['Representative','Clients','Balance USD','Total Purchased','% Pending'];
+    srHdr.forEach((v,i) => { const c=ws.getCell(row,i+1); c.value=v; c.style=HDR; });
+    row++;
+
+    const srMap = {};
+    d.forEach(r => {
+        const sr = cleanSR(r.sr1) || 'No Asignado';
+        if (!srMap[sr]) srMap[sr] = {clients:0, balance:0, bought:0, paid:0};
+        srMap[sr].clients++; srMap[sr].balance += r.balance||0; srMap[sr].bought += r.bought||0; srMap[sr].paid += r.paid||0;
+    });
+    const srArr = Object.entries(srMap).map(([n,v])=>({name:n,...v})).sort((a,b)=>b.balance-a.balance);
+
+    srArr.forEach((s,i) => {
+        const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+        ws.getCell(row,1).value = s.name; ws.getCell(row,1).style = {...bg, font:{bold:false}};
+        ws.getCell(row,2).value = s.clients; ws.getCell(row,2).style = {...bg, alignment:{horizontal:'right'}};
+        ws.getCell(row,3).value = s.balance; ws.getCell(row,3).style = {...bg, ...MONEY};
+        ws.getCell(row,4).value = s.bought; ws.getCell(row,4).style = {...bg, ...MONEY};
+        ws.getCell(row,5).value = s.bought>0?(s.balance/s.bought):0; ws.getCell(row,5).style = {...bg, ...PCT};
+        row++;
+    });
+
+    // Total SR
+    ws.getCell(row,1).value = 'TOTAL'; ws.getCell(row,1).style = ROW_TOTAL;
+    ws.getCell(row,2).value = d.length; ws.getCell(row,2).style = {...ROW_TOTAL, alignment:{horizontal:'right'}};
+    ws.getCell(row,3).value = totalBalance; ws.getCell(row,3).style = {...ROW_TOTAL, ...MONEY};
+    ws.getCell(row,4).value = totalBought; ws.getCell(row,4).style = {...ROW_TOTAL, ...MONEY};
+    ws.getCell(row,5).value = totalBought>0?(totalBalance/totalBought):0; ws.getCell(row,5).style = {...ROW_TOTAL, ...PCT};
+
+    // ════════ DATA SHEETS ════════
+    function makeDataSheet(name, rows) {
+        const ws2 = wb.addWorksheet(name, { views:[{showGridLines:false}] });
+        ws2.columns = [{width:32},{width:22},{width:30},{width:16},{width:18},{width:18},{width:16},{width:16},{width:16},{width:16},{width:12},{width:24},{width:24},{width:10},{width:22},{width:22}];
+
+        // Title
+        ws2.getCell('A3').value = name; ws2.getCell('A3').style = SECTION;
+
+        // Headers (row 5)
+        const hdrs = ['Customer','Company','Email','Cellphone','Total Purchased','Total MXN','Paid','Paid MXN','Balance USD','Balance MXN','Exchange Rate','First Purchase Date','Last Purchase Date','Last Purchase Days Ago','SR1','SR2'];
+        hdrs.forEach((v,i) => { const c=ws2.getCell(5,i+1); c.value=v; c.style=HDR; });
+
+        // Data
+        rows.forEach((r,i) => {
+            const rw = i + 6;
+            const bg = i%2===0 ? ROW_ODD : ROW_EVEN;
+            const fd = r.firstDate ? new Date(r.firstDate) : null;
+            const ld = r.lastDate ? new Date(r.lastDate) : null;
+            const vals = [r.customer||'', r.company||'', r.email||'', r.phone||'', r.bought||0, r.boughtMXN||0, r.paid||0, r.paidMXN||0, r.balance||0, r.balanceMXN||0, r.rate||0, fd, ld, r.daysAgo||0, r.sr1||'', r.sr2||''];
+            vals.forEach((v,j) => {
+                const c = ws2.getCell(rw, j+1);
+                c.value = v;
+                if ([4,5,6,7,8,9].includes(j)) c.style = {...bg, ...MONEY};
+                else if (j===10) c.style = {...bg, numFmt:'0.0'};
+                else if ([11,12].includes(j) && v) c.style = {...bg, numFmt:'MMM DD YYYY h:mmAM/PM'};
+                else c.style = bg;
+            });
+        });
+    }
+
+    // Balance Details
+    const balanceRows = d.filter(r => (r.balance||0) > 0).sort((a,b) => (b.balance||0)-(a.balance||0));
+    makeDataSheet('Balance Details', balanceRows);
+
+    // Not Assigned
+    const notAssigned = d.filter(r => !r.sr1 || r.sr1.toLowerCase()==='not assigned' || r.sr1==='').sort((a,b) => (b.balance||0)-(a.balance||0));
+    makeDataSheet('Not Assigned', notAssigned);
+
+    // Per-representative
+    const repNames = srArr.filter(s => s.name !== 'No Asignado').map(s => s.name);
+    repNames.forEach(name => {
+        const rows = d.filter(r => cleanSR(r.sr1) === name).sort((a,b) => (b.balance||0)-(a.balance||0));
+        if (rows.length > 0) makeDataSheet(name.length > 31 ? name.slice(0,31) : name, rows);
+    });
+
+    // Raw Data
+    makeDataSheet('Raw Data', d);
+
+    // Download
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = `CustomerReport_${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}.xlsx`;
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+    toast('Reporte exportado: ' + fileName, 'success');
+}
+
 // Apply saved theme on load
 (function() {
     const saved = localStorage.getItem('theme');
@@ -3778,6 +4482,559 @@ function toggleTheme() {
         document.querySelector('meta[name="theme-color"]').content = '#1a1d23';
     }
 })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REPORTE ANALISTA — Excel comparativo (anterior vs actual) con estilos dark/neutros
+// ══════════════════════════════════════════════════════════════════════════════
+const RPT_THEME = {
+    bgDark:      'FF1F232B',  // Fondo general dark
+    bgHeader:    'FF2D3039',  // Header tablas
+    bgTitle:     'FF14161C',  // Bandas de título
+    bgBandAlt:   'FF262932',  // Alt row dark
+    bgKpi:       'FF2A2E38',
+    text:        'FFE6E8EE',
+    textMuted:   'FFA8ACB8',
+    textSubtle:  'FF7A7F8C',
+    accent:      'FF8B8FA3',  // neutro (Comprado)
+    positive:    'FF5A7D65',  // verde (Cobrado / Δ+)
+    negative:    'FFB87A6A',  // ámbar (Pendiente / Δ-)
+    border:      'FF3A3E48',
+};
+
+function rptStyle(opts={}) {
+    const s = {};
+    if (opts.bg) s.fill = { fgColor: { rgb: opts.bg } };
+    const fontColor = opts.color || RPT_THEME.text;
+    s.font = {
+        name: 'Calibri',
+        sz: opts.sz || 11,
+        bold: !!opts.bold,
+        italic: !!opts.italic,
+        color: { rgb: fontColor },
+    };
+    s.alignment = {
+        horizontal: opts.align || 'left',
+        vertical: opts.valign || 'center',
+        wrapText: opts.wrap || false,
+    };
+    if (opts.border !== false) {
+        const bcolor = opts.borderColor || RPT_THEME.border;
+        s.border = {
+            top:    { style: 'thin', color: { rgb: bcolor } },
+            bottom: { style: 'thin', color: { rgb: bcolor } },
+            left:   { style: 'thin', color: { rgb: bcolor } },
+            right:  { style: 'thin', color: { rgb: bcolor } },
+        };
+    }
+    if (opts.numFmt) s.numFmt = opts.numFmt;
+    return s;
+}
+
+// Escribe una celda con valor + estilo
+function rptCell(ws, addr, value, style) {
+    ws[addr] = { v: value, t: (typeof value === 'number' ? 'n' : 's'), s: style };
+}
+
+// Construye una hoja a partir de matriz [{v, s}] y aplica !ref
+function rptBuildSheet(matrix, colWidths, merges) {
+    const ws = {};
+    let maxR = 0, maxC = 0;
+    matrix.forEach((row, r) => {
+        row.forEach((cell, c) => {
+            if (cell == null) return;
+            const addr = XLSX.utils.encode_cell({ r, c });
+            const v = cell.v;
+            const t = cell.t || (typeof v === 'number' ? 'n' : 's');
+            ws[addr] = { v: (v == null ? '' : v), t, s: cell.s };
+            if (cell.z) ws[addr].z = cell.z;
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        });
+    });
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+    if (colWidths) ws['!cols'] = colWidths.map(w => ({ wch: w }));
+    if (merges) ws['!merges'] = merges;
+    // Filas con altura custom por defecto
+    return ws;
+}
+
+// Indexa un array de rawdata por clave única (email + customer)
+function rptIndexByKey(rows) {
+    const idx = new Map();
+    rows.forEach(r => {
+        const key = ((r.email || '') + '||' + (r.customer || '')).toLowerCase().trim();
+        idx.set(key, r);
+    });
+    return idx;
+}
+
+// Totaliza un array de clientes
+function rptTotals(rows) {
+    return rows.reduce((t, r) => {
+        t.bought += r.bought || 0;
+        t.paid += r.paid || 0;
+        t.balance += r.balance || 0;
+        t.clients += 1;
+        return t;
+    }, { bought: 0, paid: 0, balance: 0, clients: 0 });
+}
+
+// Agrupa por SR1 y totaliza
+function rptGroupBySR1(rows) {
+    const g = new Map();
+    rows.forEach(r => {
+        const sr = (r.sr1 && r.sr1.trim()) ? cleanSR(r.sr1) : 'Not Assigned';
+        if (!g.has(sr)) g.set(sr, { sr1: sr, bought: 0, paid: 0, balance: 0, clients: 0 });
+        const v = g.get(sr);
+        v.bought += r.bought || 0;
+        v.paid += r.paid || 0;
+        v.balance += r.balance || 0;
+        v.clients += 1;
+    });
+    return Array.from(g.values()).sort((a, b) => b.balance - a.balance);
+}
+
+function rptPct(curr, prev) {
+    if (!prev || prev === 0) return curr === 0 ? 0 : 100;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+}
+
+function rptDeltaStyle(delta, good='positive') {
+    if (delta === 0 || delta == null) return rptStyle({ bg: RPT_THEME.bgDark, color: RPT_THEME.textMuted, align: 'right', numFmt: '"$"#,##0;[Red]-"$"#,##0' });
+    const isGood = good === 'positive' ? delta > 0 : delta < 0;
+    const col = isGood ? RPT_THEME.positive : RPT_THEME.negative;
+    return rptStyle({ bg: RPT_THEME.bgDark, color: col, align: 'right', bold: true, numFmt: '"$"#,##0;[Red]-"$"#,##0' });
+}
+
+function rptPctStyle(delta, good='positive') {
+    if (delta === 0 || delta == null) return rptStyle({ bg: RPT_THEME.bgDark, color: RPT_THEME.textMuted, align: 'right', numFmt: '0.0"%"' });
+    const isGood = good === 'positive' ? delta > 0 : delta < 0;
+    const col = isGood ? RPT_THEME.positive : RPT_THEME.negative;
+    return rptStyle({ bg: RPT_THEME.bgDark, color: col, align: 'right', bold: true, numFmt: '+0.0"%";-0.0"%";0.0"%"' });
+}
+
+async function generateAnalystReport() {
+    if (!allData || !allData.length) {
+        toast('Primero importa un Excel', 'error');
+        return;
+    }
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        toast('Libreria jsPDF no disponible', 'error');
+        return;
+    }
+    const { jsPDF } = window.jspdf;
+
+    const btn = document.getElementById('btnAnalystReport');
+    if (btn) btn.disabled = true;
+
+    try {
+        let previous = [];
+        let prevMeta = null;
+        try {
+            const res = await fetch(API_BASE + '/previous-rawdata');
+            const j = await res.json();
+            if (j.ok) { previous = j.data || []; prevMeta = j.meta || null; }
+        } catch (e) { console.warn('No se pudo cargar previous-rawdata:', e.message); }
+
+        const current = allData;
+        const cTot = rptTotals(current);
+        const pTot = rptTotals(previous);
+        const prevIdx = rptIndexByKey(previous);
+        const currIdx = rptIndexByKey(current);
+
+        const currDate = new Date();
+        const prevDate = prevMeta && prevMeta.previousImportedAt ? new Date(prevMeta.previousImportedAt) : null;
+        const fmtDate = d => d ? d.toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric' }) : 'N/A';
+        const fmtMoney = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+        const fmtDelta = v => (v > 0 ? '+' : v < 0 ? '' : '') + fmtMoney(v);
+        const fmtInt = v => (v || 0).toLocaleString('en-US');
+
+        // ─── Cálculos derivados ───
+        const newCustomers = current.filter(r => {
+            const k = ((r.email || '') + '||' + (r.customer || '')).toLowerCase().trim();
+            return !prevIdx.has(k);
+        });
+        const lostCustomers = previous.filter(r => {
+            const k = ((r.email || '') + '||' + (r.customer || '')).toLowerCase().trim();
+            return !currIdx.has(k);
+        });
+        const changes = [];
+        current.forEach(r => {
+            const k = ((r.email || '') + '||' + (r.customer || '')).toLowerCase().trim();
+            const prev = prevIdx.get(k);
+            if (!prev) return;
+            const dBought = (r.bought || 0) - (prev.bought || 0);
+            const dPaid   = (r.paid || 0) - (prev.paid || 0);
+            const dBalance = (r.balance || 0) - (prev.balance || 0);
+            if (dBought || dPaid || dBalance) {
+                changes.push({
+                    customer: r.customer, company: r.company, sr1: r.sr1,
+                    boughtPrev: prev.bought || 0, boughtCurr: r.bought || 0, dBought,
+                    paidPrev: prev.paid || 0, paidCurr: r.paid || 0, dPaid,
+                    balancePrev: prev.balance || 0, balanceCurr: r.balance || 0, dBalance,
+                });
+            }
+        });
+        const newBought = newCustomers.reduce((s, r) => s + (r.bought || 0), 0);
+        const newBalance = newCustomers.reduce((s, r) => s + (r.balance || 0), 0);
+        const collected = changes.reduce((s, c) => s + (c.dPaid > 0 ? c.dPaid : 0), 0);
+        const increasedBal = changes.reduce((s, c) => s + (c.dBalance > 0 ? c.dBalance : 0), 0);
+        const decreasedBal = changes.reduce((s, c) => s + (c.dBalance < 0 ? c.dBalance : 0), 0);
+
+        const prevBySR = rptGroupBySR1(previous);
+        const currBySR = rptGroupBySR1(current);
+        const prevSRMap = new Map(prevBySR.map(r => [r.sr1, r]));
+        const allSRs = new Set([...prevBySR.map(r => r.sr1), ...currBySR.map(r => r.sr1)]);
+        const srList = Array.from(allSRs).map(sr => {
+            const p = prevSRMap.get(sr) || { clients: 0, bought: 0, paid: 0, balance: 0 };
+            const c = currBySR.find(x => x.sr1 === sr) || { clients: 0, bought: 0, paid: 0, balance: 0 };
+            return { sr, p, c };
+        }).sort((a, b) => b.c.balance - a.c.balance);
+        const totalRow = {
+            clients: currBySR.reduce((s, r) => s + r.clients, 0),
+            bought: currBySR.reduce((s, r) => s + r.bought, 0),
+            paid: currBySR.reduce((s, r) => s + r.paid, 0),
+            balance: currBySR.reduce((s, r) => s + r.balance, 0),
+            pBought: prevBySR.reduce((s, r) => s + r.bought, 0),
+            pPaid: prevBySR.reduce((s, r) => s + r.paid, 0),
+            pBalance: prevBySR.reduce((s, r) => s + r.balance, 0),
+        };
+        const sortedNew = newCustomers.slice().sort((a, b) => (b.bought || 0) - (a.bought || 0));
+        const sortedChanges = changes.slice().sort((a, b) => Math.abs(b.dBalance) - Math.abs(a.dBalance));
+        const sortedCurr = current.slice().sort((a, b) => (b.balance || 0) - (a.balance || 0));
+
+        // ─── PDF ───
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+
+        const COL = {
+            titleBg: [30, 34, 42],
+            titleFg: [255, 255, 255],
+            subFg:   [189, 193, 198],
+            headerBg:[55, 62, 75],
+            headerFg:[255, 255, 255],
+            rowAlt:  [246, 248, 250],
+            posFg:   [34, 134, 86],
+            negFg:   [196, 64, 64],
+            mutedFg: [113, 119, 131],
+            textFg:  [20, 25, 35],
+            accentBg:[232, 236, 242],
+        };
+
+        const headerTitle = 'REPORTE GENERAL · CUENTAS POR COBRAR';
+        const headerSub = 'Comparativa: ' + fmtDate(prevDate) + '  -->  ' + fmtDate(currDate);
+
+        function drawPageHeader(pageTitle) {
+            doc.setFillColor(...COL.titleBg);
+            doc.rect(0, 0, pageW, 52, 'F');
+            doc.setTextColor(...COL.titleFg);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text(pageTitle || headerTitle, 28, 24);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...COL.subFg);
+            doc.text(headerSub, 28, 42);
+            doc.setTextColor(...COL.textFg);
+        }
+
+        // ══════ PAGINA 1: RESUMEN EJECUTIVO ══════
+        drawPageHeader();
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(...COL.textFg);
+        doc.text('KPIs Globales', 28, 78);
+
+        const deltaClients = cTot.clients - pTot.clients;
+        const kpiRows = [
+            ['Total Comprado',   fmtMoney(pTot.bought),   fmtMoney(cTot.bought),   fmtDelta(cTot.bought - pTot.bought),   rptPct(cTot.bought, pTot.bought).toFixed(1) + '%'],
+            ['Total Cobrado',    fmtMoney(pTot.paid),     fmtMoney(cTot.paid),     fmtDelta(cTot.paid - pTot.paid),       rptPct(cTot.paid, pTot.paid).toFixed(1) + '%'],
+            ['Balance Pendiente',fmtMoney(pTot.balance),  fmtMoney(cTot.balance),  fmtDelta(cTot.balance - pTot.balance), rptPct(cTot.balance, pTot.balance).toFixed(1) + '%'],
+            ['Clientes',         fmtInt(pTot.clients),    fmtInt(cTot.clients),    (deltaClients >= 0 ? '+' : '') + fmtInt(deltaClients), rptPct(cTot.clients, pTot.clients).toFixed(1) + '%'],
+        ];
+        doc.autoTable({
+            startY: 86,
+            head: [['Metrica', 'Anterior', 'Actual', 'Delta Absoluto', 'Delta %']],
+            body: kpiRows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 10, halign: 'center' },
+            bodyStyles: { fontSize: 10, textColor: COL.textFg, cellPadding: 6 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+            margin: { left: 28, right: 28 },
+            didParseCell: d => {
+                if (d.section === 'body' && (d.column.index === 3 || d.column.index === 4)) {
+                    const raw = (d.cell.raw || '').toString();
+                    if (raw.startsWith('+') || (d.row.index !== 2 && !raw.startsWith('-'))) {
+                        d.cell.styles.textColor = d.row.index === 2
+                            ? (raw.startsWith('-') ? COL.posFg : COL.negFg)
+                            : (raw.startsWith('-') ? COL.negFg : COL.posFg);
+                        d.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            },
+        });
+
+        let y2 = doc.lastAutoTable.finalY + 22;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(...COL.textFg);
+        doc.text('Highlights Operativos', 28, y2);
+
+        const hlRows = [
+            ['Ordenes nuevas',        fmtInt(newCustomers.length),  newCustomers.length + ' clientes nuevos en el corte actual'],
+            ['Monto comprado nuevos', fmtMoney(newBought),          'Suma de compras de los clientes nuevos'],
+            ['Balance nuevos',        fmtMoney(newBalance),         'Saldo pendiente generado por clientes nuevos'],
+            ['Clientes perdidos',     fmtInt(lostCustomers.length), 'Estaban en el corte anterior, ya no aparecen'],
+            ['Cobrado en el periodo', fmtMoney(collected),          'Suma de incrementos en la columna Cobrado'],
+            ['Balance incrementado',  fmtMoney(increasedBal),       'Saldo que crecio respecto al periodo anterior'],
+            ['Balance reducido',      fmtMoney(decreasedBal),       'Saldo que disminuyo (clientes pagaron mas)'],
+        ];
+        doc.autoTable({
+            startY: y2 + 8,
+            head: [['Concepto', 'Valor', 'Detalle']],
+            body: hlRows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 10 },
+            bodyStyles: { fontSize: 10, textColor: COL.textFg, cellPadding: 5 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: { 0: { cellWidth: 170 }, 1: { halign: 'right', cellWidth: 130, fontStyle: 'bold' }, 2: { textColor: COL.mutedFg } },
+            margin: { left: 28, right: 28 },
+        });
+
+        // ══════ PAGINA 2: POR SR1 ══════
+        doc.addPage();
+        drawPageHeader('COMPARATIVO POR REPRESENTANTE (SR1)');
+
+        const sr1Rows = srList.map(row => {
+            const pctC = row.c.bought > 0 ? (row.c.paid / row.c.bought * 100) : 0;
+            return [
+                row.sr,
+                fmtInt(row.c.clients),
+                fmtMoney(row.p.bought), fmtMoney(row.c.bought), fmtDelta(row.c.bought - row.p.bought),
+                fmtMoney(row.p.paid),   fmtMoney(row.c.paid),   fmtDelta(row.c.paid - row.p.paid),
+                fmtMoney(row.p.balance),fmtMoney(row.c.balance),fmtDelta(row.c.balance - row.p.balance),
+                pctC.toFixed(1) + '%',
+            ];
+        });
+        const totPct = totalRow.bought > 0 ? (totalRow.paid / totalRow.bought * 100) : 0;
+        sr1Rows.push([
+            'TOTAL', fmtInt(totalRow.clients),
+            fmtMoney(totalRow.pBought), fmtMoney(totalRow.bought), fmtDelta(totalRow.bought - totalRow.pBought),
+            fmtMoney(totalRow.pPaid),   fmtMoney(totalRow.paid),   fmtDelta(totalRow.paid - totalRow.pPaid),
+            fmtMoney(totalRow.pBalance),fmtMoney(totalRow.balance),fmtDelta(totalRow.balance - totalRow.pBalance),
+            totPct.toFixed(1) + '%',
+        ]);
+
+        doc.autoTable({
+            startY: 64,
+            head: [['Representante','Clientes','Comp. Ant.','Comp. Act.','D Comp.','Cobr. Ant.','Cobr. Act.','D Cobr.','Bal. Ant.','Bal. Act.','D Bal.','% Cobr.']],
+            body: sr1Rows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+            bodyStyles: { fontSize: 8, textColor: COL.textFg, cellPadding: 3 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: {
+                0: { cellWidth: 95 },
+                1: { halign: 'right' },
+                2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
+                5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' },
+                8: { halign: 'right' }, 9: { halign: 'right' }, 10:{ halign: 'right' }, 11:{ halign: 'right' },
+            },
+            margin: { left: 20, right: 20 },
+            didParseCell: d => {
+                if (d.section === 'body' && d.row.index === sr1Rows.length - 1) {
+                    d.cell.styles.fillColor = COL.accentBg;
+                    d.cell.styles.fontStyle = 'bold';
+                }
+                if (d.section === 'body' && d.row.index < sr1Rows.length - 1) {
+                    const raw = (d.cell.raw || '').toString();
+                    if (d.column.index === 4 || d.column.index === 7) {
+                        if (raw.startsWith('+')) d.cell.styles.textColor = COL.posFg;
+                        else if (raw.startsWith('-')) d.cell.styles.textColor = COL.negFg;
+                    } else if (d.column.index === 10) {
+                        if (raw.startsWith('+')) d.cell.styles.textColor = COL.negFg;
+                        else if (raw.startsWith('-')) d.cell.styles.textColor = COL.posFg;
+                    }
+                }
+            },
+        });
+
+        // ══════ PAGINA 3: ORDENES NUEVAS ══════
+        doc.addPage();
+        drawPageHeader('ORDENES NUEVAS');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...COL.mutedFg);
+        doc.text(`${newCustomers.length} clientes · ${fmtMoney(newBought)} comprado · ${fmtMoney(newBalance)} pendiente`, 28, 68);
+
+        const nuevasRows = sortedNew.map(r => [
+            r.customer || '',
+            r.company || '',
+            cleanSR(r.sr1 || 'Not Assigned'),
+            fmtMoney(r.bought || 0),
+            fmtMoney(r.paid || 0),
+            fmtMoney(r.balance || 0),
+            r.firstDate ? new Date(r.firstDate).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }) : '—',
+            r.lastDate ? new Date(r.lastDate).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }) : '—',
+        ]);
+        if (!nuevasRows.length) nuevasRows.push(['Sin clientes nuevos en este corte', '', '', '', '', '', '', '']);
+
+        doc.autoTable({
+            startY: 78,
+            head: [['Cliente','Empresa','SR1','Comprado','Cobrado','Pendiente','1ra Compra','Ult. Compra']],
+            body: nuevasRows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 9 },
+            bodyStyles: { fontSize: 8, textColor: COL.textFg, cellPadding: 3 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: {
+                3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
+                6: { halign: 'center' }, 7: { halign: 'center' },
+            },
+            margin: { top: 62, left: 24, right: 24 },
+            didDrawPage: d => { if (d.pageNumber > 1) drawPageHeader('ORDENES NUEVAS (cont.)'); },
+            didParseCell: d => {
+                if (d.section === 'body' && d.column.index === 5) {
+                    const v = parseFloat(((d.cell.raw || '').toString()).replace(/[^0-9.-]/g, ''));
+                    if (v > 0) { d.cell.styles.textColor = COL.negFg; d.cell.styles.fontStyle = 'bold'; }
+                }
+            },
+        });
+
+        // ══════ PAGINA 4: CAMBIOS DE SALDO ══════
+        doc.addPage();
+        drawPageHeader('CAMBIOS DE SALDO');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...COL.mutedFg);
+        doc.text(`${sortedChanges.length} clientes con cambios · Cobrado +${fmtMoney(collected)} · D Balance ${fmtDelta(totalRow.balance - totalRow.pBalance)}`, 28, 68);
+
+        const cambiosRows = sortedChanges.map(c => [
+            c.customer || '',
+            cleanSR(c.sr1 || 'Not Assigned'),
+            fmtMoney(c.boughtPrev), fmtMoney(c.boughtCurr), fmtDelta(c.dBought),
+            fmtMoney(c.paidPrev),   fmtMoney(c.paidCurr),   fmtDelta(c.dPaid),
+            fmtMoney(c.balancePrev),fmtMoney(c.balanceCurr),fmtDelta(c.dBalance),
+        ]);
+        if (!cambiosRows.length) cambiosRows.push(['Sin cambios en clientes existentes', '', '', '', '', '', '', '', '', '', '']);
+
+        doc.autoTable({
+            startY: 78,
+            head: [['Cliente','SR1','Comp. Ant.','Comp. Act.','D Comp.','Cobr. Ant.','Cobr. Act.','D Cobr.','Bal. Ant.','Bal. Act.','D Bal.']],
+            body: cambiosRows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 8.5 },
+            bodyStyles: { fontSize: 8, textColor: COL.textFg, cellPadding: 3 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: {
+                0: { cellWidth: 130 },
+                2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},
+                5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},
+                8:{halign:'right'},9:{halign:'right'},10:{halign:'right'},
+            },
+            margin: { top: 62, left: 20, right: 20 },
+            didDrawPage: d => { if (d.pageNumber > 1) drawPageHeader('CAMBIOS DE SALDO (cont.)'); },
+            didParseCell: d => {
+                if (d.section === 'body') {
+                    const raw = (d.cell.raw || '').toString();
+                    if (d.column.index === 4 || d.column.index === 7) {
+                        if (raw.startsWith('+')) d.cell.styles.textColor = COL.posFg;
+                        else if (raw.startsWith('-')) d.cell.styles.textColor = COL.negFg;
+                    } else if (d.column.index === 10) {
+                        if (raw.startsWith('+')) d.cell.styles.textColor = COL.negFg;
+                        else if (raw.startsWith('-')) d.cell.styles.textColor = COL.posFg;
+                    }
+                }
+            },
+        });
+
+        // ══════ PAGINA 5+: DESGLOSE COMPLETO ══════
+        doc.addPage();
+        drawPageHeader('DESGLOSE COMPLETO · ESTADO ACTUAL');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...COL.mutedFg);
+        doc.text(`${current.length} clientes · Corte: ${fmtDate(currDate)}`, 28, 68);
+
+        const desgloseRows = sortedCurr.map(r => {
+            const pct = (r.bought || 0) > 0 ? ((r.paid || 0) / r.bought) * 100 : 0;
+            const ld = r.lastDate ? new Date(r.lastDate).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+            const estado = (r.balance || 0) <= 0 ? 'AL CORRIENTE' : (r.daysAgo || 0) > 60 ? 'MORA' : (r.daysAgo || 0) > 30 ? 'VENCIDO' : 'VIGENTE';
+            return [
+                r.customer || '',
+                r.company || '',
+                cleanSR(r.sr1 || 'Not Assigned'),
+                fmtMoney(r.bought || 0),
+                fmtMoney(r.paid || 0),
+                fmtMoney(r.balance || 0),
+                pct.toFixed(1) + '%',
+                fmtInt(r.daysAgo || 0),
+                ld,
+                estado,
+            ];
+        });
+
+        doc.autoTable({
+            startY: 78,
+            head: [['Cliente','Empresa','SR1','Comprado','Cobrado','Pendiente','% Cobr.','Dias','Ult. Compra','Estado']],
+            body: desgloseRows,
+            theme: 'grid',
+            headStyles: { fillColor: COL.headerBg, textColor: COL.headerFg, fontStyle: 'bold', fontSize: 8.5 },
+            bodyStyles: { fontSize: 7.5, textColor: COL.textFg, cellPadding: 2.5 },
+            alternateRowStyles: { fillColor: COL.rowAlt },
+            columnStyles: {
+                3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
+                6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'center' }, 9: { halign: 'center', fontStyle: 'bold' },
+            },
+            margin: { top: 62, left: 20, right: 20 },
+            didDrawPage: d => { if (d.pageNumber > 1) drawPageHeader('DESGLOSE COMPLETO (cont.)'); },
+            didParseCell: d => {
+                if (d.section === 'body') {
+                    if (d.column.index === 5) {
+                        const v = parseFloat(((d.cell.raw || '').toString()).replace(/[^0-9.-]/g, ''));
+                        if (v > 0) { d.cell.styles.textColor = COL.negFg; d.cell.styles.fontStyle = 'bold'; }
+                    }
+                    if (d.column.index === 9) {
+                        const raw = (d.cell.raw || '').toString();
+                        if (raw === 'AL CORRIENTE') d.cell.styles.textColor = COL.posFg;
+                        else if (raw === 'MORA') d.cell.styles.textColor = COL.negFg;
+                        else if (raw === 'VENCIDO') d.cell.styles.textColor = [204, 153, 102];
+                        else d.cell.styles.textColor = COL.mutedFg;
+                    }
+                    if (d.column.index === 6) {
+                        const raw = parseFloat(((d.cell.raw || '').toString()).replace('%', ''));
+                        if (raw >= 80) d.cell.styles.textColor = COL.posFg;
+                        else if (raw < 50) d.cell.styles.textColor = COL.negFg;
+                    }
+                }
+            },
+        });
+
+        // ── Footer en todas las paginas ──
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(...COL.mutedFg);
+            doc.text('MIT Finanzas · Reporte General · Generado ' + currDate.toLocaleString('es-MX', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }), 28, pageH - 14);
+            doc.text(`Pagina ${i} de ${pageCount}`, pageW - 28, pageH - 14, { align: 'right' });
+        }
+
+        const fname = `ReporteGeneral_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fname);
+        toast(`PDF generado · ${newCustomers.length} nuevos, ${sortedChanges.length} cambios`, 'success');
+    } catch (err) {
+        console.error('Error generando PDF:', err);
+        toast('Error generando PDF: ' + err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 
 </script>
 <script>
