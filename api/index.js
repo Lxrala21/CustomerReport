@@ -49,6 +49,7 @@ const customerFields = {
     daysAgo:    { type: Number, default: 0 },
     sr1:        { type: String, default: '' },
     sr2:        { type: String, default: '' },
+    enteredBy:  { type: String, default: '' },
 };
 
 const schemaOpts = { timestamps: false, versionKey: false };
