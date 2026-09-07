@@ -4446,14 +4446,14 @@ async function exportDashboard() {
     const balanceRows = d.filter(r => (r.balance||0) > 0).sort((a,b) => (b.balance||0)-(a.balance||0));
     makeDataSheet('Balance Details', balanceRows);
 
-    // Not Assigned (incluye Miguel Ferrer)
-    const notAssigned = d.filter(r => !r.sr1 || r.sr1.toLowerCase()==='not assigned' || r.sr1==='' || isMiguelFerrer(r.sr1)).sort((a,b) => (b.balance||0)-(a.balance||0));
+    // Not Assigned (incluye Miguel Ferrer) — solo cuentas con saldo pendiente
+    const notAssigned = d.filter(r => (r.balance||0) > 0 && (!r.sr1 || r.sr1.toLowerCase()==='not assigned' || r.sr1==='' || isMiguelFerrer(r.sr1))).sort((a,b) => (b.balance||0)-(a.balance||0));
     makeDataSheet('Not Assigned', notAssigned);
 
-    // Per-representative (excluye Miguel Ferrer — va en Not Assigned)
-    const repNames = srArr.filter(s => s.name !== 'No Asignado' && s.name !== 'Miguel Ferrer').map(s => s.name);
+    // Per-representative (excluye Miguel Ferrer — va en Not Assigned), pestañas en orden alfabético, solo cuentas con saldo pendiente
+    const repNames = srArr.filter(s => s.name !== 'No Asignado' && s.name !== 'Miguel Ferrer').map(s => s.name).sort((a,b) => a.localeCompare(b));
     repNames.forEach(name => {
-        const rows = d.filter(r => cleanSR(r.sr1) === name).sort((a,b) => (b.balance||0)-(a.balance||0));
+        const rows = d.filter(r => (r.balance||0) > 0 && cleanSR(r.sr1) === name).sort((a,b) => (b.balance||0)-(a.balance||0));
         if (rows.length > 0) makeDataSheet(name.length > 31 ? name.slice(0,31) : name, rows);
     });
 
