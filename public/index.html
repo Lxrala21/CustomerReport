@@ -2585,6 +2585,28 @@ function drawMainChart() {
     }
 }
 
+function shortDateLabel(d) {
+    if (d.label) {
+        const short = d.label.replace(/\s+\d{4}\s*$/, '').trim();
+        if (short) return short;
+    }
+    return d.date ? new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : '';
+}
+
+// Elige que indices reciben etiqueta para que no se encimen cuando hay muchos snapshots
+function stepIndices(n, slotWidth, minGap) {
+    if (n <= 1) return new Set([0]);
+    const step = Math.max(1, Math.ceil(minGap / slotWidth));
+    const idx = [];
+    for (let i = 0; i < n; i += step) idx.push(i);
+    if (idx[idx.length - 1] !== n - 1) {
+        const lastShown = idx[idx.length - 1];
+        if ((n - 1 - lastShown) * slotWidth >= minGap * 0.6) idx.push(n - 1);
+        else idx[idx.length - 1] = n - 1;
+    }
+    return new Set(idx);
+}
+
 function drawBarsChart(canvasId, snapshots, currentTotals) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
@@ -2646,6 +2668,15 @@ function drawBarsChart(canvasId, snapshots, currentTotals) {
     // Bar geometry (una sola barra apilada por snapshot)
     const groupW = chartW / n;
     const barW = Math.min(64, groupW * 0.55);
+
+    // Con muchos snapshots las fechas y los TOTAL se encimarian: solo se etiquetan
+    // los indices que caben sin traslape (el resto sigue disponible en el tooltip)
+    const measureCtx = canvas.getContext('2d');
+    measureCtx.font = '400 10.5px Inter, sans-serif';
+    const dateLabelW = Math.max(0, ...data.map(d => measureCtx.measureText(shortDateLabel(d)).width));
+    measureCtx.font = '700 12px Inter, sans-serif';
+    const totalLabelW = Math.max(0, ...data.map(d => measureCtx.measureText(fmtShort(d.bought || (d.paid || 0) + (d.balance || 0))).width));
+    const shownIdx = stepIndices(n, groupW, Math.max(dateLabelW, totalLabelW) + 14);
 
     let hoverCol = -1;
 
@@ -2740,8 +2771,8 @@ function drawBarsChart(canvasId, snapshots, currentTotals) {
                 ctx.textBaseline = 'alphabetic';
             }
 
-            // Etiqueta "Total" + Comprado encima de la barra
-            if (ease >= 0.85 && total > 0) {
+            // Etiqueta "Total" + Comprado encima de la barra (solo en indices sin traslape)
+            if (ease >= 0.85 && total > 0 && (shownIdx.has(i) || hoverCol === i)) {
                 const topY = baseY - totalH;
                 ctx.textAlign = 'center';
                 ctx.fillStyle = getThemeColor('--text-muted');
@@ -2752,12 +2783,13 @@ function drawBarsChart(canvasId, snapshots, currentTotals) {
                 ctx.fillText(fmtShort(d.bought || total), cx, topY - 6);
             }
 
-            // X label (fecha)
-            ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
-            ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            const dateLabel = d.label || new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
-            ctx.fillText(dateLabel, cx, padT + chartH + 20);
+            // X label (fecha) - solo en indices sin traslape; el resto se ve en el tooltip
+            if (shownIdx.has(i) || hoverCol === i) {
+                ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
+                ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(shortDateLabel(d), cx, padT + chartH + 20);
+            }
         });
 
         // Legend
@@ -2925,6 +2957,13 @@ function drawLineChart(canvasId, snapshots) {
     const chartH = h - padT - padB;
     const stepX = n > 1 ? chartW / (n - 1) : chartW;
 
+    // Con muchos snapshots las fechas se encimarian: solo se etiquetan los indices
+    // que caben sin traslape (el resto sigue disponible en el tooltip)
+    const measureCtx = canvas.getContext('2d');
+    measureCtx.font = '400 10.5px Inter, sans-serif';
+    const dateLabelW = Math.max(0, ...data.map(d => measureCtx.measureText(shortDateLabel(d)).width));
+    const shownIdx = stepIndices(n, stepX, dateLabelW + 14);
+
     // Build points
     const pts = series.map(s => data.map((d, i) => ({
         x: padL + (n > 1 ? i * stepX : chartW / 2),
@@ -2950,14 +2989,14 @@ function drawLineChart(canvasId, snapshots) {
             ctx.fillText(fmtShort(val), padL - 10, y + 4);
         }
 
-        // X labels (fechas)
+        // X labels (fechas) - solo en indices sin traslape; el resto se ve en el tooltip
         data.forEach((d, i) => {
+            if (!shownIdx.has(i) && hoverCol !== i) return;
             const x = padL + (n > 1 ? i * stepX : chartW / 2);
             ctx.fillStyle = hoverCol === i ? getThemeColor('--text') : getThemeColor('--text-muted');
             ctx.font = (hoverCol === i ? '600' : '400') + ' 10.5px Inter, sans-serif';
             ctx.textAlign = 'center';
-            const dateLabel = d.label || new Date(d.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
-            ctx.fillText(dateLabel, x, padT + chartH + 20);
+            ctx.fillText(shortDateLabel(d), x, padT + chartH + 20);
         });
 
         // Vertical hover line
